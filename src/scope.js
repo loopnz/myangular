@@ -11,29 +11,45 @@ function Scope() {
 function initWatchVal() {}
 
 Scope.prototype.$watch = function(watchFn, listenerFn, valueEq) {
+    var self = this;
     var watcher = {
         watchFn: watchFn,
         listenerFn: listenerFn,
         last: initWatchVal,
         valueEq: !!valueEq
     };
-    this.$$watchers.push(watcher);
+    this.$$watchers.unshift(watcher);
     this.$$lastDirtyWatch = null;
+
+    return function() {
+        var index = self.$$watchers.indexOf(watcher);
+        if (index != -1) {
+            self.$$watchers.splice(index, 1);
+            self.$$lastDirtyWatch = null;
+        }
+    };
 };
 
 Scope.prototype.$$digestOnce = function() {
     var self = this;
     var dirty = false;
-    _.forEach(this.$$watchers, function(watcher) {
-        var newValue = watcher.watchFn(self);
-        var oldValue = watcher.last;
-        if (!self.$$areEqual(newValue, oldValue, watcher.valueEq)) {
-            self.$$lastDirtyWatch = watcher;
-            dirty = true;
-            watcher.last = watcher.valueEq ? _.cloneDeep(newValue) : newValue;
-            watcher.listenerFn(newValue, oldValue === initWatchVal ? newValue : oldValue, self);
-        } else if (watcher === self.$$lastDirtyWatch) {
-            return false;
+    _.forEachRight(this.$$watchers, function(watcher) {
+        try {
+            if (watcher) {
+                var newValue = watcher.watchFn(self);
+                var oldValue = watcher.last;
+                if (!self.$$areEqual(newValue, oldValue, watcher.valueEq)) {
+                    self.$$lastDirtyWatch = watcher;
+                    dirty = true;
+                    watcher.last = watcher.valueEq ? _.cloneDeep(newValue) : newValue;
+                    watcher.listenerFn(newValue, oldValue === initWatchVal ? newValue : oldValue, self);
+                } else if (watcher === self.$$lastDirtyWatch) {
+                    return false;
+                }
+            }
+
+        } catch (e) {
+            console.error(e);
         }
 
     });
@@ -52,8 +68,13 @@ Scope.prototype.$digest = function() {
     }
     do {
         while (this.$$asyncQueue.length) {
-            var asyncTask = this.$$asyncQueue.shift();
-            asyncTask.scope.$eval(asyncTask.expression);
+            try {
+                var asyncTask = this.$$asyncQueue.shift();
+                asyncTask.scope.$eval(asyncTask.expression);
+            } catch (e) {
+                console.error(e);
+            }
+
         }
         dirty = this.$$digestOnce();
         if ((dirty || this.$$asyncQueue.length) && !(ttl--)) {
@@ -64,7 +85,12 @@ Scope.prototype.$digest = function() {
 
     this.$clearPhase();
     while (this.$$postDigestQneue.length) {
-        this.$$postDigestQneue.shift()();
+        try {
+            this.$$postDigestQneue.shift()();
+        } catch (e) {
+            console.error(e);
+        }
+
     }
 };
 
@@ -135,7 +161,12 @@ Scope.prototype.$applyAsync = function(expr) {
 
 Scope.prototype.$$flushApplyAsync = function() {
     while (this.$$applyAsyncQneue.length) {
-        this.$$applyAsyncQneue.shift()();
+        try {
+            this.$$applyAsyncQneue.shift()();
+        } catch (e) {
+            console.error(e);
+        }
+
     }
     this.$$applyAsyncId = null;
 };
@@ -143,4 +174,25 @@ Scope.prototype.$$flushApplyAsync = function() {
 Scope.prototype.$$postDigest = function(fn) {
 
     this.$$postDigestQneue.push(fn);
+};
+
+Scope.prototype.$watchGroup=function(watchFns,listenerFn){
+	var self=this;
+	var newValues=new Array(watchFns.length);
+	var oldValues=new Array(watchFns.length);
+	var changeReactionScheduled=false;
+	function watchGroupListener(){
+		listenerFn(newValues,oldValues,self);
+		changeReactionScheduled=false;
+	}
+	_.forEach(watchFns,function(watchFn,i){
+		self.$watch(watchFn,function(newValue,oldValue,scope){
+			newValues[i]=newValue;
+			oldValues[i]=oldValue;
+			if(!changeReactionScheduled){
+				changeReactionScheduled=true;
+				self.$evalAsync(watchGroupListener);
+			}			
+		});
+	});
 };
