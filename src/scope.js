@@ -176,23 +176,55 @@ Scope.prototype.$$postDigest = function(fn) {
     this.$$postDigestQneue.push(fn);
 };
 
-Scope.prototype.$watchGroup=function(watchFns,listenerFn){
-	var self=this;
-	var newValues=new Array(watchFns.length);
-	var oldValues=new Array(watchFns.length);
-	var changeReactionScheduled=false;
-	function watchGroupListener(){
-		listenerFn(newValues,oldValues,self);
-		changeReactionScheduled=false;
-	}
-	_.forEach(watchFns,function(watchFn,i){
-		self.$watch(watchFn,function(newValue,oldValue,scope){
-			newValues[i]=newValue;
-			oldValues[i]=oldValue;
-			if(!changeReactionScheduled){
-				changeReactionScheduled=true;
-				self.$evalAsync(watchGroupListener);
-			}			
-		});
-	});
+Scope.prototype.$watchGroup = function(watchFns, listenerFn) {
+    var self = this;
+    var newValues = new Array(watchFns.length);
+    var oldValues = new Array(watchFns.length);
+    var changeReactionScheduled = false;
+    var firstRun = false;
+
+    if (watchFns.length === 0) {
+        var shouldCall = true;
+        self.$evalAsync(function() {
+            if (shouldCall) {
+                listenerFn(newValues, newValues, self);
+            }
+        });
+        return function() {
+            shouldCall = false;
+        };
+    }
+
+    function watchGroupListener() {
+        if (firstRun) {
+            firstRun = true;
+            listenerFn(newValues, newValues, self);
+        } else {
+            listenerFn(newValues, oldValues, self);
+        }
+
+        changeReactionScheduled = false;
+    }
+
+    var destoryFunctions = _.map(watchFns, function(watchFn, i) {
+
+        return self.$watch(watchFn, function(newValue, oldValue) {
+            newValues[i] = newValue;
+            oldValues[i] = oldValue;
+            if (!changeReactionScheduled) {
+                changeReactionScheduled = true;
+                self.$evalAsync(watchGroupListener);
+            }
+        });
+
+    });
+
+    return function() {
+
+        _.forEach(destoryFunctions, function(destoryFunction) {
+            destoryFunction();
+        });
+
+    };
+
 };
