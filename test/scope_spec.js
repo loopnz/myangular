@@ -994,15 +994,15 @@ describe("Scope", function() {
         });
 
         it('创建子scope时使用指定的父级scope', function() {
-            var prototypeParent=new Scope();
-            var hierarchyParent=new Scope();
-            var child=prototypeParent.$new(false,hierarchyParent);
+            var prototypeParent = new Scope();
+            var hierarchyParent = new Scope();
+            var child = prototypeParent.$new(false, hierarchyParent);
 
-            prototypeParent.a=42;
+            prototypeParent.a = 42;
             expect(child.a).toBe(42);
 
-            child.counter=0;
-            child.$watch(function(scope){
+            child.counter = 0;
+            child.$watch(function(scope) {
                 scope.counter++;
             });
             prototypeParent.$digest();
@@ -1013,15 +1013,15 @@ describe("Scope", function() {
         });
 
         it('使用$destory方法销毁scope', function() {
-            var parent=new Scope();
-            var child=parent.$new();
-            child.aValue=[1,2,3];
-            child.counter=0;
-            child.$watch(function(scope){
+            var parent = new Scope();
+            var child = parent.$new();
+            child.aValue = [1, 2, 3];
+            child.counter = 0;
+            child.$watch(function(scope) {
                 return scope.aValue;
-            },function(newValue,oldValue,scope){
+            }, function(newValue, oldValue, scope) {
                 scope.counter++;
-            },true);
+            }, true);
             parent.$digest();
             expect(child.counter).toBe(1);
             child.aValue.push(4);
@@ -1035,6 +1035,133 @@ describe("Scope", function() {
             expect(child.counter).toBe(2);
 
         });
+    });
+
+
+    describe('$watchCollection', function() {
+        var scope;
+        beforeEach(function() {
+            scope = new Scope();
+        });
+
+        it('$watchCollection监测非对象和非数组', function() {
+            var value;
+            scope.aValue = 42;
+            scope.counter = 0;
+            scope.$watchCollection(function(scope) {
+                return scope.aValue;
+            }, function(newValue, oldValue, scope) {
+                value = newValue;
+                scope.counter++;
+            });
+
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+            expect(value).toBe(scope.aValue);
+            scope.aValue = 43;
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+
+        });
+
+        it('处理NaN', function() {
+            scope.aValue=0/0;
+            scope.counter=0;
+            scope.$watchCollection(function(scope){
+                return scope.aValue;
+            },function(newValue,oldValue,scope){
+                scope.counter++;
+            });
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+        });
+
+        it('当值变为数组时(新加个数组)', function() {
+            scope.counter=0;
+             scope.$watchCollection(function(scope){
+                return scope.aValue;
+            },function(newValue,oldValue,scope){
+                scope.counter++;
+            });
+             scope.$digest();
+             expect(scope.counter).toBe(1);
+             scope.aValue=[1,2,3];
+             scope.$digest();
+             expect(scope.counter).toBe(2);
+             scope.$digest();
+             expect(scope.counter).toBe(2);
+        });
+
+        it('数组添加元素', function() {
+            scope.arr=[1,2,3];
+            scope.counter=0;
+              scope.$watchCollection(function(scope){
+                return scope.arr;
+            },function(newValue,oldValue,scope){
+                scope.counter++;
+            });
+
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+            scope.arr.push(4);
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+        });
+
+           it('数组移除元素', function() {
+            scope.arr=[1,2,3];
+            scope.counter=0;
+              scope.$watchCollection(function(scope){
+                return scope.arr;
+            },function(newValue,oldValue,scope){
+                scope.counter++;
+            });
+
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+            scope.arr.shift();
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+        });
+
+        it('数组替换元素', function() {
+            scope.arr=[1,2,3];
+            scope.counter=0;
+              scope.$watchCollection(function(scope){
+                return scope.arr;
+            },function(newValue,oldValue,scope){
+                scope.counter++;
+            });
+
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+            scope.arr[1]=42;
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+        });
+
+
+        it('数组重新排列顺序', function() {
+            scope.arr=[2,1,3];
+            scope.counter=0;
+              scope.$watchCollection(function(scope){
+                return scope.arr;
+            },function(newValue,oldValue,scope){
+                scope.counter++;
+            });
+
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+            scope.arr.sort();
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+        });
+
+
+
     });
 
 

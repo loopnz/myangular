@@ -280,3 +280,50 @@ Scope.prototype.$destory = function() {
     this.$$watchers = null;
 
 };
+
+Scope.prototype.$watchCollection = function(watchFn, listenerFn) {
+    var self = this;
+    var newValue;
+    var oldValue;
+    var changeCount = 0;
+    var internalWatchFn = function(scope) {
+        newValue = watchFn(scope);
+        if(_.isObject(newValue)){
+            if(_.isArray(newValue)){
+                if(!_.isArray(oldValue)){
+                    changeCount++;
+                    oldValue=[];
+                }
+                if(newValue.length!==oldValue.length){
+                    changeCount++;
+                    oldValue.length=newValue.length;
+                }
+
+                _.forEach(newValue,function(newItem,i){
+                    if(newItem!==oldValue[i]){
+                        changeCount++;
+                        oldValue[i]=newItem;
+                    }
+                });
+
+            }else{
+
+            }
+
+        }else {
+            if (!self.$$areEqual(newValue,oldValue,false)) {
+                changeCount++;
+            }
+            oldValue = newValue;
+        }
+        
+        return changeCount;
+    };
+
+    var internalListenerFn = function() {
+        listenerFn(newValue, oldValue, self);
+    };
+
+    return this.$watch(internalWatchFn, internalListenerFn);
+
+};
