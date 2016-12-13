@@ -286,42 +286,85 @@ Scope.prototype.$watchCollection = function(watchFn, listenerFn) {
     var newValue;
     var oldValue;
     var changeCount = 0;
+    var oldLength = 0;
+    var veryOldValue;
+    var trackVeryOldValue = (listenerFn.length > 1);
+    var firstRun = true;
     var internalWatchFn = function(scope) {
+        var newLength;
         newValue = watchFn(scope);
-        if(_.isObject(newValue)){
-            if(_.isArray(newValue)){
-                if(!_.isArray(oldValue)){
+        if (_.isObject(newValue)) {
+            if (_.isArrayLike(newValue)) {
+                if (!_.isArray(oldValue)) {
                     changeCount++;
-                    oldValue=[];
+                    oldValue = [];
                 }
-                if(newValue.length!==oldValue.length){
+                if (newValue.length !== oldValue.length) {
                     changeCount++;
-                    oldValue.length=newValue.length;
+                    oldValue.length = newValue.length;
                 }
-
-                _.forEach(newValue,function(newItem,i){
-                    if(newItem!==oldValue[i]){
+                _.forEach(newValue, function(newItem, i) {
+                    var bothNaN = _.isNaN(newItem) && _.isNaN(oldValue[1]);
+                    if (!bothNaN && newItem !== oldValue[i]) {
                         changeCount++;
-                        oldValue[i]=newItem;
+                        oldValue[i] = newItem;
                     }
                 });
+            } else {
+                if (!_.isObject(oldValue) || _.isArrayLike(oldValue)) {
+                    changeCount++;
+                    oldValue = {};
+                    oldLength = 0;
+                }
+                newLength = 0;
+                _.forOwn(newValue, function(newVal, key) {
+                    newLength++;
+                    if (oldValue.hasOwnProperty(key)) {
+                        var bothNaN = _.isNaN(newVal) && _.isNaN(oldValue[key]);
+                        if (!bothNaN && oldValue[key] !== newVal) {
+                            changeCount++;
+                            oldValue[key] = newVal;
+                        }
+                    } else {
+                        changeCount++;
+                        oldLength++;
+                        oldValue[key] = newVal;
+                    }
 
-            }else{
+                });
+                if (oldLength > newLength) {
+                    changeCount++;
+                    _.forOwn(oldValue, function(oldVal, key) {
+                        if (!newValue.hasOwnProperty(key)) {
+                            oldLength--;
+                            delete oldValue[key];
+                        }
+                    });
+                }
+
 
             }
-
-        }else {
-            if (!self.$$areEqual(newValue,oldValue,false)) {
+        } else {
+            if (!self.$$areEqual(newValue, oldValue, false)) {
                 changeCount++;
             }
             oldValue = newValue;
         }
-        
+
         return changeCount;
     };
 
     var internalListenerFn = function() {
-        listenerFn(newValue, oldValue, self);
+        if (firstRun) {
+            listenerFn(newValue, newValue, self);
+            firstRun = false;
+        } else {
+            listenerFn(newValue, veryOldValue, self);
+        }
+        if (trackVeryOldValue) {
+            veryOldValue = _.clone(newValue);
+        }
+
     };
 
     return this.$watch(internalWatchFn, internalListenerFn);

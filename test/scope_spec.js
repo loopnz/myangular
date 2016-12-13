@@ -1,6 +1,6 @@
 describe("Scope", function() {
 
-    it("能构建普通js对象", function() {
+    it("创建scope对象,scope就是普通js对象", function() {
         var scope = new Scope();
         scope.aProperty = 1;
         expect(scope.aProperty).toBe(1);
@@ -1067,12 +1067,12 @@ describe("Scope", function() {
 
         });
 
-        it('处理NaN', function() {
-            scope.aValue=0/0;
-            scope.counter=0;
-            scope.$watchCollection(function(scope){
+        it('值比较的时候处理NaN', function() {
+            scope.aValue = 0 / 0;
+            scope.counter = 0;
+            scope.$watchCollection(function(scope) {
                 return scope.aValue;
-            },function(newValue,oldValue,scope){
+            }, function(newValue, oldValue, scope) {
                 scope.counter++;
             });
             scope.$digest();
@@ -1080,27 +1080,27 @@ describe("Scope", function() {
         });
 
         it('当值变为数组时(新加个数组)', function() {
-            scope.counter=0;
-             scope.$watchCollection(function(scope){
+            scope.counter = 0;
+            scope.$watchCollection(function(scope) {
                 return scope.aValue;
-            },function(newValue,oldValue,scope){
+            }, function(newValue, oldValue, scope) {
                 scope.counter++;
             });
-             scope.$digest();
-             expect(scope.counter).toBe(1);
-             scope.aValue=[1,2,3];
-             scope.$digest();
-             expect(scope.counter).toBe(2);
-             scope.$digest();
-             expect(scope.counter).toBe(2);
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+            scope.aValue = [1, 2, 3];
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+            scope.$digest();
+            expect(scope.counter).toBe(2);
         });
 
         it('数组添加元素', function() {
-            scope.arr=[1,2,3];
-            scope.counter=0;
-              scope.$watchCollection(function(scope){
+            scope.arr = [1, 2, 3];
+            scope.counter = 0;
+            scope.$watchCollection(function(scope) {
                 return scope.arr;
-            },function(newValue,oldValue,scope){
+            }, function(newValue, oldValue, scope) {
                 scope.counter++;
             });
 
@@ -1111,12 +1111,12 @@ describe("Scope", function() {
             expect(scope.counter).toBe(2);
         });
 
-           it('数组移除元素', function() {
-            scope.arr=[1,2,3];
-            scope.counter=0;
-              scope.$watchCollection(function(scope){
+        it('数组移除元素', function() {
+            scope.arr = [1, 2, 3];
+            scope.counter = 0;
+            scope.$watchCollection(function(scope) {
                 return scope.arr;
-            },function(newValue,oldValue,scope){
+            }, function(newValue, oldValue, scope) {
                 scope.counter++;
             });
 
@@ -1128,28 +1128,28 @@ describe("Scope", function() {
         });
 
         it('数组替换元素', function() {
-            scope.arr=[1,2,3];
-            scope.counter=0;
-              scope.$watchCollection(function(scope){
+            scope.arr = [1, 2, 3];
+            scope.counter = 0;
+            scope.$watchCollection(function(scope) {
                 return scope.arr;
-            },function(newValue,oldValue,scope){
+            }, function(newValue, oldValue, scope) {
                 scope.counter++;
             });
 
             scope.$digest();
             expect(scope.counter).toBe(1);
-            scope.arr[1]=42;
+            scope.arr[1] = 42;
             scope.$digest();
             expect(scope.counter).toBe(2);
         });
 
 
         it('数组重新排列顺序', function() {
-            scope.arr=[2,1,3];
-            scope.counter=0;
-              scope.$watchCollection(function(scope){
+            scope.arr = [2, 1, 3];
+            scope.counter = 0;
+            scope.$watchCollection(function(scope) {
                 return scope.arr;
-            },function(newValue,oldValue,scope){
+            }, function(newValue, oldValue, scope) {
                 scope.counter++;
             });
 
@@ -1158,6 +1158,215 @@ describe("Scope", function() {
             scope.arr.sort();
             scope.$digest();
             expect(scope.counter).toBe(2);
+        });
+
+        it('处理数组中的NaN', function() {
+            scope.arr = [2, NaN, 3];
+            scope.counter = 0;
+            scope.$watchCollection(function(scope) {
+                return scope.arr;
+            }, function(newValue, oldValue, scope) {
+                scope.counter++;
+            });
+
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+        });
+
+        it('array like对象的处理,比如arguments中的元素替换', function() {
+            (function() {
+                scope.arrayLike = arguments;
+            })(1, 2, 3);
+            scope.counter = 0;
+            scope.$watchCollection(function(scope) {
+                return scope.arrayLike;
+            }, function(newValue, oldValue, scope) {
+                scope.counter++;
+            });
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+            scope.arrayLike[1] = 42;
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+
+        });
+
+        it('arrayLike对象的处理,比如nodeList的元素替换', function() {
+
+            document.documentElement.appendChild(document.createElement('div'));
+            scope.arrayLike = document.getElementsByTagName('div');
+
+            scope.counter = 0;
+            scope.$watchCollection(function(scope) {
+                return scope.arrayLike;
+            }, function(newValue, oldValue, scope) {
+                scope.counter++;
+            });
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+            document.documentElement.appendChild(document.createElement('div'));
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+        });
+
+        it('当值变为对象时(新加对象)', function() {
+            scope.counter = 0;
+            scope.$watchCollection(function(scope) {
+                return scope.obj;
+            }, function(newValue, oldValue, scope) {
+                scope.counter++;
+            });
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+            scope.obj = { a: 1 };
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+
+        });
+
+        it('当对象添加属性时', function() {
+
+            scope.counter = 0;
+            scope.obj = { a: 1 };
+            scope.$watchCollection(function(scope) {
+                return scope.obj;
+            }, function(newValue, oldValue, scope) {
+                scope.counter++;
+            });
+
+            scope.$digest();
+            scope.obj.b = 2;
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+        });
+
+        it('当对象属性的值变化时', function() {
+
+            scope.counter = 0;
+            scope.obj = { a: 1 };
+            scope.$watchCollection(function(scope) {
+                return scope.obj;
+            }, function(newValue, oldValue, scope) {
+                scope.counter++;
+            });
+
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+            scope.obj.a = 2;
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+        });
+
+        it('处理对象的属性的值为NaN', function() {
+            scope.counter = 0;
+            scope.obj = { a: NaN };
+            scope.$watchCollection(function(scope) {
+                return scope.obj;
+            }, function(newValue, oldValue, scope) {
+                scope.counter++;
+            });
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+        });
+
+        it('当删除对象属性时', function() {
+            scope.counter = 0;
+            scope.obj = { a: 1 };
+            scope.$watchCollection(function(scope) {
+                return scope.obj;
+            }, function(newValue, oldValue, scope) {
+                scope.counter++;
+            });
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+            delete scope.obj.a;
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+        });
+
+        it('处理含有length属性的对象', function() {
+            scope.counter = 0;
+            scope.obj = { length: 1, name: 'tom' };
+            scope.$watchCollection(function(scope) {
+                return scope.obj;
+            }, function(newValue, oldValue, scope) {
+                scope.counter++;
+            });
+            scope.$digest();
+            expect(scope.counter).toBe(1);
+            scope.obj.newKey = 'def';
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+            scope.$digest();
+            expect(scope.counter).toBe(2);
+        });
+
+        it('将变化前的非对象的值传给listener函数', function() {
+            scope.aValue = 42;
+            var oldValueGiven;
+            scope.$watchCollection(function(scope) {
+                return scope.aValue;
+            }, function(newValue, oldValue, scope) {
+               oldValueGiven = oldValue;
+            });
+            scope.$digest();
+            scope.aValue = 43;
+            scope.$digest();
+            expect(oldValueGiven).toBe(42);
+        });
+
+        it('将变化前的array传给listener函数', function() {
+            scope.aValue = [1, 2, 3];
+            var oldValueGiven;
+            scope.$watchCollection(function(scope) {
+                return scope.aValue;
+            }, function(newValue, oldValue, scope) {
+                oldValueGiven = oldValue;
+            });
+            scope.$digest();
+            expect(oldValueGiven).toEqual([1, 2, 3]);
+            scope.aValue.push(4);
+            scope.$digest();
+            expect(oldValueGiven).toEqual([1, 2, 3]);
+        });
+
+        it('将变化前的object传给listener函数', function() {
+            scope.aValue = { a: 1, b: 2 };
+            var oldValueGiven;
+            scope.$watchCollection(function(scope) {
+                return scope.aValue;
+            }, function(newValue, oldValue, scope) {
+                oldValueGiven = oldValue;
+            });
+            scope.$digest();
+            expect(oldValueGiven).toEqual({ a: 1, b: 2 });
+            scope.aValue.c = 3;
+            scope.$digest();
+            expect(oldValueGiven).toEqual({ a: 1, b: 2 });
+        });
+
+        it('第一次digest的时候使用newValue', function() {
+             scope.aValue = { a: 1, b: 2 };
+            var oldValueGiven;
+            scope.$watchCollection(function(scope) {
+                return scope.aValue;
+            }, function(newValue, oldValue, scope) {
+                oldValueGiven = oldValue;
+            });
+            scope.$digest();
+            expect(oldValueGiven).toEqual({ a: 1, b: 2 });
         });
 
 
