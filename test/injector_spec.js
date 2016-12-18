@@ -242,3 +242,211 @@ describe('注解(annotate)', function() {
 		});
 
 });
+
+describe('provider', function() {
+	
+	it('使用对象的$get方法注册provider', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('a',{
+			$get:function(){
+				return 42;
+			}
+		});
+		var injector=createInjector(['myModule']);
+		expect(injector.has('a')).toBe(true);
+		expect(injector.get('a')).toBe(42);
+
+	});
+
+	it('给$get方法注入依赖参数', function() {
+		var module=angular.module('myModule',[]);
+		module.constant('a',1);
+		module.provider('b',{
+			$get:function(a){
+				return a+2;
+			}
+		});
+		var injector=createInjector(['myModule']);
+		expect(injector.get('b')).toBe(3);
+	});
+
+	it('给$get方法延迟注入参数', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('b',{
+			$get:function(a){
+				return a+2;
+			}
+		});
+
+		module.provider('a',{
+			$get:_.constant(1)
+		});
+		var injector=createInjector(['myModule']);
+		expect(injector.get('b')).toBe(3);
+
+	});
+
+	it('仅仅实例化依赖1次(单例)', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('a',{
+			$get:function(){
+				return {};
+			}
+		});
+		var injector=createInjector(['myModule']);
+		expect(injector.get('a')).toBe(injector.get('a'));
+	});
+
+	it('当产生循环依赖时抛出异常信息', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('a',{$get:function(b){}});
+		module.provider('b',{$get:function(c){}});
+		module.provider('c',{$get:function(a){}});
+		var injector=createInjector(['myModule']);
+		expect(function(){
+			injector.get('a');
+		}).toThrowError(/Circular dependency found/);
+	});
+
+	it('当实例化失败时需要清空循环依赖的标志', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('a',{$get:function(){
+			throw 'Failing instantiation';
+		}});
+
+		var injector=createInjector(['myModule']);
+		expect(function(){
+			injector.get('a');
+		}).toThrow('Failing instantiation');
+		expect(function(){
+			injector.get('a');
+		}).toThrow('Failing instantiation');
+	});
+
+	it('提示循环依赖的具体信息', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('a',{$get:function(b){}});
+		module.provider('b',{$get:function(c){}});
+		module.provider('c',{$get:function(a){}});
+		var injector=createInjector(['myModule']);
+		expect(function(){
+			injector.get('a');
+		}).toThrowError('Circular dependency found:a<-c<-b<-a');
+	});
+
+	it('当参数是构造函数时实例化provider', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('a',function AProvider(){
+			this.$get=function(){
+				return 42;
+			};
+		});
+		var injector=createInjector(['myModule']);
+		expect(injector.get('a')).toBe(42);
+	});
+
+	it('将常量依赖注入到给定的provider构造函数中', function() {
+		var module=angular.module('myModule',[]);
+		module.constant('b',2);
+		module.provider('a',function(b){
+			this.$get=function(){
+				return 1+b;
+			};
+		});
+		var injector=createInjector(['myModule']);
+		expect(injector.get('a')).toBe(3);
+	});
+
+	it('将其他的provider构造函数注入到provider构造函数中', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('a',function(){
+			var value=1;
+			this.setValue=function(v){
+				value=v;
+			};
+			this.$get=function(){
+				return value;
+			};
+		});
+		module.provider('b',function(aProvider){
+			aProvider.setValue(2);
+			this.$get=function(){};
+		});
+		var injector=createInjector(['myModule']);
+		expect(injector.get('a')).toBe(2);
+	});
+	it('不注入实例到provider的构造函数中', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('a',function(){
+			this.$get=function(){
+				return 1;
+			};
+		});
+
+		module.provider('b',function(a){
+			this.$get=function(){return a;};
+		});
+		expect(function(){
+			createInjector(['myModule']);
+		}).toThrow();
+	});
+
+	it('不注入provider到$get函数', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('a',function(){
+			this.$get=function(){
+				return 1;
+			};
+		});
+
+		module.provider('b',function(){
+			this.$get=function(aProvider){return aProvider.$get();};
+		});
+
+		var injector=createInjector(['myModule']);
+		expect(function(){
+			injector.get('b');
+		}).toThrow();
+	});
+
+	it('不注入provider到invoke函数', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('a',function(){
+			this.$get=function(){
+				return 1;
+			};
+		});
+		var injector=createInjector(['myModule']);
+
+		expect(function(){
+			injector.invoke(function(aProvider){});
+		}).toThrow();
+
+	});
+
+	it('不能用get方法取providers', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('a',function(){
+			this.$get=function(){
+				return 1;
+			};
+		});
+		var injector=createInjector(['myModule']);
+		expect(function(){
+			injector.get('aProvider');
+		}).toThrow();
+	});
+
+	it('首先注册常量', function() {
+		var module=angular.module('myModule',[]);
+		module.provider('a',function(b){
+			this.$get=function(){
+				return b;
+			};
+		});
+
+		module.constant('b',42);
+		var injector=createInjector(['myModule']);
+		expect(injector.get('a')).toBe(42);
+	});
+});

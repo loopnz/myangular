@@ -5,18 +5,25 @@ function setupModuleLoader(window) {
 
     var angular = ensure(window, "angular", Object);
 
+
     var createModule = function(name, requires, modules) {
         if (name === 'hasOwnProperty') {
             throw 'hasOwnProperty is not a valid module name';
         }
-        var invokeQueue=[];
+        var invokeQueue = [];
+        var invokeLater = function(method,arrayMethod) {
+
+            return function() {
+                invokeQueue[arrayMethod||'push']([method, arguments]);
+                return moduleInstance;
+            };
+        };
         var moduleInstance = {
             name: name,
             requires: requires,
-            constant:function(key,value){
-            	invokeQueue.push(['constant',[key,value]]);
-            },
-            _invokeQueue:invokeQueue
+            constant: invokeLater('constant','unshift'),
+            provider: invokeLater('provider'),
+            _invokeQueue: invokeQueue
         };
 
         modules[name] = moduleInstance;
