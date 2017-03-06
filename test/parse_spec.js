@@ -148,4 +148,18 @@ describe('parse', function() {
         expect(fn(scope)).toBe(scope);
         expect(fn()).toBeUndefined();
     });
+
+    it('解析对象的属性值(用点号)', function() {
+    	var fn=parse('aKey.anotherKey');
+    	expect(fn({aKey:{anotherKey:42}})).toBe(42);
+    	expect(fn({aKey:{}})).toBeUndeinfed();
+    	expect(fn({})).toBeUndefined();
+    });
+
+    it('直接解析对象的值', function() {
+    	var fn=parse('{aKey:42}.aKey');  
+
+    	expect(fn()).toBe(42);
+
+    });
 });
