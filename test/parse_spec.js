@@ -152,15 +152,64 @@ describe('parse', function() {
     it('解析对象的属性值(用点号)', function() {
     	var fn=parse('aKey.anotherKey');
     	expect(fn({aKey:{anotherKey:42}})).toBe(42);
-    	expect(fn({aKey:{}})).toBeUndeinfed();
+    	expect(fn({aKey:{}})).toBeUndefined();
     	expect(fn({})).toBeUndefined();
     });
 
     it('直接解析对象的值', function() {
     	var fn=parse('{aKey:42}.aKey');  
-
     	expect(fn()).toBe(42);
+    });
 
+    it('使用多个点调用对象', function() {
+        var fn=parse("aKey.secondKey.thirdKey.fourthKey");
+        expect(fn({aKey:{secondKey:{thirdKey:{fourthKey:42}}}})).toBe(42);
+        expect(fn({aKey:{secondKey:{thirdKey:{}}}})).toBeUndefined();
+        expect(fn({aKey:{}})).toBeUndefined();
+        expect(fn()).toBeUndefined();
+    });
+
+    it('如果局部对象参数有key,使用局部对象作为scope', function() {
+        var  fn=parse('aKey');
+        var scope={aKey:42};
+        var local={aKey:43};
+        expect(fn(scope,local)).toBe(43);
+    });
+
+    it('如果局部对象没有匹配的key,不使用局部对象作为scope', function() {
+         var  fn=parse('aKey');
+        var scope={aKey:42};
+        var local={anotherKey:43};
+        expect(fn(scope,local)).toBe(42);
+    });
+
+    it('使用局部对象时只比较第一层级的key', function() {
+        var fn=parse('aKey.otherKey');
+        var scope={aKey:{otherKey:32}};
+        var local={aKey:{}};
+        expect(fn(scope,local)).toBeUndefined();
+    });
+
+    it('解析中括号调用的对象属性', function() {
+        var fn=parse('aKey["otherKey"]');
+        expect(fn({aKey:{otherKey:32}})).toBe(32);
+    });
+
+    it('解析中括号调用形式的数组', function() {
+        var fn=parse('array[1]');
+        expect(fn({array:[1,2,3]})).toBe(2);
+    });
+
+    it('解析计算属性中使用其他key的值作为属性', function() {
+        var fn=parse('aKey[key]');
+        expect(fn({key:'theKey',aKey:{theKey:42}})).toBe(42);
+    });
+
+    it('解析计算属性(中括号形式)中其他key的值(对象)取值调用', function() {
+        var fn=parse('lock[keys["aKey"]]');
+        expect(fn({keys:{aKey:'theKey'},lock:{
+            theKey:42
+        }})).toBe(42);
     });
 });
 
