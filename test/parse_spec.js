@@ -211,6 +211,42 @@ describe('parse', function() {
             theKey:42
         }})).toBe(42);
     });
+
+    it('解析函数调用', function() {
+        var fn=parse('aFunction()');
+        expect(fn({aFunction:function(){return 42;}})).toBe(42);
+    });
+
+    it('解析函数调用,给函数传递number类型参数', function() {
+        var fn=parse('aFunction(42)');
+        expect(fn({aFunction:function(n){return n;}})).toBe(42);
+    });
+
+    it('解析函数调用,给函数传递标识符类型的参数', function() {
+        var fn=parse('aFunction(n)');
+        expect(fn({n:42,aFunction:function(arg){return arg;}})).toBe(42);
+    });
+
+    it('解析函数调用,给函数传递的参数是解析另一个函数调用的结果', function() {
+        var fn=parse('aFunction(argFn())');
+        expect(fn({
+            argFn:_.constant(42),
+            aFunction:function(arg){
+                return arg;
+            }
+        })).toBe(42);
+    });
+
+    it('解析函数调用,给函数传递多个参数', function() {
+        var fn=parse('aFunction(37,n,argFn())');
+        expect(fn({
+            n:3,
+            argFn:_.constant(2),
+            aFunction:function(a1,a2,a3){
+                return a1+a2+a3;
+            }
+        })).toBe(42);
+    });
 });
 
 

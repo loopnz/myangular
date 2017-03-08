@@ -26,7 +26,7 @@ Lexer.prototype.lex = function(text) {
             this.readNumber();
         } else if (this.is('\'"')) {
             this.readString(this.ch);
-        } else if (this.is('[],{}:.')) {
+        } else if (this.is('[],{}:.()')) {
             this.tokens.push({
                 text: this.ch
             });
@@ -164,6 +164,7 @@ AST.Property = 'Property';
 AST.Identifier = 'Identifier';
 AST.ThisExpression='ThisExpression';
 AST.MemberExpression='MemberExpression';
+AST.CallExpression='CallExpression';
 AST.prototype.constants = {
     'null': { type: AST.Literal, value: null },
     'true': { type: AST.Literal, value: true },
@@ -199,7 +200,7 @@ AST.prototype.primary = function() {
     }
     var next;
 
-    while((next=this.expect('.','['))){
+    while((next=this.expect('.','[','('))){
         if(next.text==='['){
             primary={
                 type:AST.MemberExpression,
@@ -208,13 +209,20 @@ AST.prototype.primary = function() {
                 computed:true
             };
             this.consume(']');
-        }else{
-           primary={
+        }else if(next.text === '.'){
+            primary={
                 type:AST.MemberExpression,
                 object:primary,
                 property:this.identifier(),
                 computed:false
+            };
+        }else if(next.text==='('){
+           primary={
+                type:AST.CallExpression,
+                callee:primary,
+                arguments:this.parseArguments()
             }; 
+            this.consume(')');
         }
     }
     return primary;
@@ -238,7 +246,15 @@ AST.prototype.object = function() {
     this.consume('}');
     return { type: AST.ObjectExpression, properties: properties };
 };
-
+AST.prototype.parseArguments=function(){
+    var args=[];
+    if(!this.peek(')')){
+        do{
+            args.push(this.primary());
+        }while(this.expect(','));
+    }
+    return args;
+};
 AST.prototype.identifier = function() {
     return { type: AST.Identifier, name: this.consume().text };
 };
@@ -349,7 +365,12 @@ ASTCompiler.prototype.recurse = function(ast) {
                             
             }
             return intoId;
-
+        case AST.CallExpression:
+            var callee=this.recurse(ast.callee);
+            var args=_.map(ast.arguments,function(arg){
+                return this.recurse(arg);
+            },this);
+            return callee+"&&"+callee+"("+args.join(",")+")";
     }
 };
 ASTCompiler.prototype.getHasOwnProperty=function(object,property){
