@@ -217,20 +217,30 @@ describe('parse', function() {
 
     it('解析函数调用', function() {
         var fn = parse('aFunction()');
-        expect(fn({ aFunction: function() {
-                return 42; } })).toBe(42);
+        expect(fn({
+            aFunction: function() {
+                return 42;
+            }
+        })).toBe(42);
     });
 
     it('解析函数调用,给函数传递number类型参数', function() {
         var fn = parse('aFunction(42)');
-        expect(fn({ aFunction: function(n) {
-                return n; } })).toBe(42);
+        expect(fn({
+            aFunction: function(n) {
+                return n;
+            }
+        })).toBe(42);
     });
 
     it('解析函数调用,给函数传递标识符类型的参数', function() {
         var fn = parse('aFunction(n)');
-        expect(fn({ n: 42, aFunction: function(arg) {
-                return arg; } })).toBe(42);
+        expect(fn({
+            n: 42,
+            aFunction: function(arg) {
+                return arg;
+            }
+        })).toBe(42);
     });
 
     it('解析函数调用,给函数传递的参数是解析另一个函数调用的结果', function() {
@@ -279,7 +289,7 @@ describe('parse', function() {
         expect(fn(scope)).toBe(42);
     });
 
-    it('直接调用的方法内部的this绑定到scope', function() {
+    it('直接调用的方法的内部的this绑定到scope', function() {
         var scope = {
             a: function() {
                 return this;
@@ -288,7 +298,7 @@ describe('parse', function() {
         var fn = parse('a()');
         expect(fn(scope)).toBe(scope);
     });
-    it('直接调用的方法内部的this绑定到local(局部变量)', function() {
+    it('直接调用的方法的内部的this绑定到local(局部变量)', function() {
         var scope = {};
         var local = {
             a: function() {
@@ -298,4 +308,57 @@ describe('parse', function() {
         var fn = parse('a()');
         expect(fn(scope, local)).toBe(local);
     });
+
+    it('简单赋值', function() {
+        var fn = parse("a=42");
+        var scope = {};
+        fn(scope);
+        expect(scope.a).toBe(42);
+    });
+
+    it('所赋与的值是函数的返回值', function() {
+        var fn = parse('a=aFunction()');
+        var scope = {
+            aFunction: function() {
+                return 42;
+            }
+        };
+        fn(scope);
+        expect(scope.a).toBe(42);
+    });
+
+    it('给scope的对象属性使用标识符赋值', function() {
+        var fn = parse("a.aKey=42");
+        var scope = {
+            a: {}
+        };
+        fn(scope);
+        expect(scope.a.aKey).toBe(42);
+    });
+
+    it('给scope的对象属性使用计算属性的方式赋值', function() {
+        var fn = parse("a['aKey']=42");
+        var scope = {
+            a: {}
+        };
+        fn(scope);
+        expect(scope.a.aKey).toBe(42);
+    });
+
+    it('给scope中内部嵌入对象赋值', function() {
+        var fn = parse('a[0].aKey=42');
+        var scope = {
+            a: [{}]
+        };
+        fn(scope);
+        expect(scope.a[0].aKey).toBe(42);
+    });
+
+    it('给scope中还不存在的对象赋值', function() {
+        var fn=parse('some["nested"].property.path=42');
+        var scope={};
+        fn(scope);
+        expect(scope.some.nested.property.path).toBe(42);
+    });
+
 });
