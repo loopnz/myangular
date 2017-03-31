@@ -355,10 +355,224 @@ describe('parse', function() {
     });
 
     it('给scope中还不存在的对象赋值', function() {
-        var fn=parse('some["nested"].property.path=42');
-        var scope={};
+        var fn = parse('some["nested"].property.path=42');
+        var scope = {};
         fn(scope);
         expect(scope.some.nested.property.path).toBe(42);
     });
 
+    it('解析一元运算符', function() {
+        expect(parse("+42")()).toBe(42);
+        expect(parse('+a')({ a: 42 })).toBe(42);
+    });
+
+    it('将初始值为undefined的变量默认初始值改为0', function() {
+        expect(parse("+a")({})).toBe(0);
+    });
+
+    it('解析!运算符', function() {
+        expect(parse('!true')()).toBe(false);
+        expect(parse('!42')()).toBe(false);
+        expect(parse('!a')({ a: false })).toBe(true);
+        expect(parse('!!a')({ a: false })).toBe(false);
+    });
+
+    it('解析-运算符', function() {
+        expect(parse('-42')()).toBe(-42);
+        expect(parse('-a')({ a: -42 })).toBe(42);
+        expect(parse('--a')({ a: -42 })).toBe(-42);
+        expect(parse('-a')({})).toBe(0);
+    });
+
+    it('不解析字符串中的!(感叹号)', function() {
+        expect(parse('"!"')()).toBe("!");
+    });
+    it('解析乘法', function() {
+        expect(parse("21 * 2")()).toBe(42);
+    });
+
+    it('解析除法', function() {
+        expect(parse('84 / 2')()).toBe(42);
+    });
+
+    it('解析求余运算', function() {
+        expect(parse('85 % 43')()).toBe(42);
+    });
+
+    it('解析多个乘法运算', function() {
+        expect(parse('36*2%5')()).toBe(2);
+    });
+
+    it('解析加法', function() {
+        expect(parse('20+22')()).toBe(42);
+    });
+
+    it('解析减法', function() {
+        expect(parse("42-22")()).toBe(20);
+    });
+
+    it('先解析优先级高的运算', function() {
+        expect(parse('2+3*5')()).toBe(17);
+        expect(parse('2+3*2+3')()).toBe(11);
+    });
+
+    it('解析关系表达式', function() {
+        expect(parse('1<2')()).toBe(true);
+        expect(parse('1>2')()).toBe(false);
+        expect(parse('1<=2')()).toBe(true);
+        expect(parse('2<=2')()).toBe(true);
+        expect(parse('1>=2')()).toBe(false);
+        expect(parse('2>=2')()).toBe(true);
+    });
+    it('解析相等表达式', function() {
+        expect(parse('42 == 42')()).toBe(true);
+        expect(parse('42=="42"')()).toBe(true);
+        expect(parse('42!=42')()).toBe(false);
+        expect(parse('42===42')()).toBe(true);
+        expect(parse('42==="42"')()).toBe(false);
+        expect(parse('42!==42')()).toBe(false);
+    });
+
+    it('关系表达式的优先级高于相等的优先级', function() {
+        expect(parse('2=="2">2==="2"')()).toBe(false);
+    });
+
+    it('算术运算的优先级高于关系表达式', function() {
+        expect(parse('2+3<6-2')()).toBe(false);
+    });
+
+    it('解析逻辑运算符&&', function() {
+        expect(parse('true&&true')()).toBe(true);
+        expect(parse('true&&false')()).toBe(false);
+    });
+
+    it('解析逻辑运算符||', function() {
+        expect(parse('true||true')()).toBe(true);
+        expect(parse('true||false')()).toBe(true);
+        expect(parse('false||false')()).toBe(false);
+    });
+
+    it('解析多重逻辑运算符&&', function() {
+        expect(parse('true&&true&&true')()).toBe(true);
+        expect(parse('true&&true&&false')()).toBe(false);
+    });
+
+    it('解析多重逻辑运算符||', function() {
+        expect(parse('true||true||true')()).toBe(true);
+        expect(parse('true||true||false')()).toBe(true);
+        expect(parse('false||false||true')()).toBe(true);
+        expect(parse('false||false||false')()).toBe(false);
+    });
+
+    it('处理逻辑&&的短路', function() {
+        var invoked;
+        var scope = {
+            fn: function() {
+                invoked = true;
+            }
+        };
+        parse('false&&fn()')(scope);
+        expect(invoked).toBeUndefined();
+    });
+
+    it('处理逻辑||的短路', function() {
+        var invoked;
+        var scope = {
+            fn: function() {
+                invoked = true;
+            }
+        };
+        parse('true||fn()')(scope);
+        expect(invoked).toBeUndefined();
+    });
+
+    it('逻辑&&的优先级要高于逻辑||', function() {
+        expect(parse('false&&true||true')()).toBe(true);
+    });
+
+    it('逻辑表达式的优先级要低于相等的优先级', function() {
+        expect(parse('1===2||2===2')()).toBe(true);
+    });
+
+    it('解析三目运算符', function() {
+        expect(parse('a===42?true:false')({ a: 42 })).toBe(true);
+        expect(parse('a===42?true:false')({ a: 43 })).toBe(false);
+    });
+
+    it('逻辑或的优先级高于三目运算符', function() {
+        expect(parse('0||1?0||2:0||3')()).toBe(2);
+    });
+
+    it('parses nested ternaries', function() {
+        expect(
+            parse('a===42?b===42?"a and b":"a":c===42?"c":"none"')({
+                a: 44,
+                b: 43,
+                c: 42
+            })
+        ).toEqual('c');
+    });
+
+    it('使用括号改变运算优先级', function() {
+        expect(parse('21*(3-1)')()).toBe(42);
+        expect(parse('false&&(true||true)')()).toBe(false);
+        expect(parse('-((a%2)===0?1:2)')({ a: 42 })).toBe(-1);
+    });
+
+    it('parses several statements', function() {
+        var fn = parse('a=1;b=2;c=3');
+        var scope = {};
+        fn(scope);
+        expect(scope).toEqual({ a: 1, b: 2, c: 3 });
+    });
+
+    it('返回最后一个语句的值', function() {
+        expect(parse('a=1;b=2;a+b')({})).toBe(3);
+    });
+
+    it('解析包含过滤器的表达式', function() {
+        register('upcase', function() {
+            return function(str) {
+                return str.toUpperCase();
+            };
+        });
+        var fn = parse('a|upcase');
+        expect(fn({ a: 'hello' })).toBe('HELLO');
+    });
+
+    it('解析串联的过滤器', function() {
+        register('upcase', function() {
+            return function(str) {
+                return str.toUpperCase();
+            };
+        });
+         register('exclamate', function() {
+            return function(str) {
+                return str+"!";
+            };
+        });
+        var fn = parse('a|upcase|exclamate');
+        expect(fn({ a: 'hello' })).toBe('HELLO!');
+    });
+
+    it('给过滤器传递参数', function() {
+        register('repeat',function(){
+            return function(s,times){
+                return _.repeat(s,times);
+             };
+        });
+        var fn=parse('a|repeat:3');
+        expect(fn({a:'hello'})).toEqual('hellohellohello');
+    });
+
+    it('可以给过滤器传递多个参数', function() {
+        register('surround',function(){
+            return function(str,left,right){
+                return left+str+right;
+            };
+        });
+        var fn=parse('"hello"|surround:"*":"!"');
+        expect(fn()).toEqual('*hello!');
+    });
 });
+

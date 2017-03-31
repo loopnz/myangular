@@ -5,5 +5,12 @@ _.mixin({
         }
         var length = obj.length;
         return length === 0 || (_.isNumber(length) && length > 0 && (length - 1) in obj);
+    },
+    repeat: function(str, times) {
+        if (!times) {
+            times = 1;
+        }
+        var arr = new Array(times + 1);
+        return arr.join(str);
     }
 });
