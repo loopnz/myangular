@@ -1,3 +1,4 @@
+/*global parse:false*/
 function Scope() {
     this.$$watchers = [];
     this.$$lastDirtyWatch = null;
@@ -16,7 +17,7 @@ function initWatchVal() {}
 Scope.prototype.$watch = function(watchFn, listenerFn, valueEq) {
     var self = this;
     var watcher = {
-        watchFn: watchFn,
+        watchFn: parse(watchFn),
         listenerFn: listenerFn,
         last: initWatchVal,
         valueEq: !!valueEq
@@ -121,14 +122,14 @@ Scope.prototype.$$areEqual = function(newValue, oldValue, valueEq) {
 };
 
 Scope.prototype.$eval = function(expr, locals) {
-
+    expr=parse(expr);
     return expr(this, locals);
 };
 
 Scope.prototype.$apply = function(expr, locals) {
     try {
         this.$beginPhase("$apply");
-        this.$eval(expr, locals);
+        return this.$eval(expr, locals);
     } finally {
         this.$clearPhase();
         this.$root.$digest();
@@ -293,6 +294,7 @@ Scope.prototype.$watchCollection = function(watchFn, listenerFn) {
     var veryOldValue;
     var trackVeryOldValue = (listenerFn.length > 1);
     var firstRun = true;
+    watchFn=parse(watchFn);
     var internalWatchFn = function(scope) {
         var newLength;
         newValue = watchFn(scope);

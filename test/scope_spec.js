@@ -606,6 +606,48 @@ describe("Scope", function() {
             expect(scope.counter).toBe(0);
         });
 
+        it('接收表达式形式的参数', function() {
+            var theValue;
+            scope.aValue = 42;
+            scope.$watch('aValue', function(newValue, oldValue) {
+                theValue = newValue;
+            });
+            scope.$digest();
+            expect(theValue).toBe(42);
+        });
+
+        it('$watchCollection接收表达式形式的参数', function() {
+            var theValue;
+            scope.arr = [1, 2, 3];
+            scope.$watchCollection('arr', function(newValue, oldValue, scope) {
+                theValue = newValue;
+            });
+
+            scope.$digest();
+            expect(theValue).toEqual([1, 2, 3]);
+        });
+
+        it('$eval方法接收表达式', function() {
+            scope.name = 42;
+            expect(scope.$eval('name')).toBe(42);
+        });
+
+        it('$apply方法接收表达式', function() {
+            scope.aFunction = _.constant(42);
+            expect(scope.$apply('aFunction()')).toBe(42);
+        });
+        it('$evalAsync方法接收表达式', function(done) {
+            var called;
+            scope.a = function() {
+                called = true;
+            };
+            scope.$evalAsync('a()');
+            scope.$$postDigest(function() {
+                expect(called).toBe(true);
+                done();
+            });
+
+        });
     });
 
     describe('$watchGroup', function() {
@@ -1566,73 +1608,73 @@ describe("Scope", function() {
         });
 
         it('停止事件冒泡到父级scope', function() {
-            var sl=function(event){
+            var sl = function(event) {
                 event.stopPropagation();
             };
-            var pl=jasmine.createSpy();
-            scope.$on('one',sl);
-            parent.$on("one",pl);
+            var pl = jasmine.createSpy();
+            scope.$on('one', sl);
+            parent.$on("one", pl);
             scope.$emit("one");
             expect(pl).not.toHaveBeenCalled();
         });
 
-          it('停止事件冒泡不会阻止当前scope的事件触发', function() {
-            var sl=function(event){
+        it('停止事件冒泡不会阻止当前scope的事件触发', function() {
+            var sl = function(event) {
                 event.stopPropagation();
             };
-            var pl=jasmine.createSpy();
-            scope.$on('one',sl);
-            scope.$on("one",pl);
+            var pl = jasmine.createSpy();
+            scope.$on('one', sl);
+            scope.$on("one", pl);
             scope.$emit("one");
             expect(pl).toHaveBeenCalled();
         });
 
-          it('设置defaultPrevented 值当调用preventDefault方法时', function() {
-              var l=function(e){
+        it('设置defaultPrevented 值当调用preventDefault方法时', function() {
+            var l = function(e) {
                 e.preventDefault();
-              };
-              scope.$on("one",l);
-              var event=scope.$emit("one");
-              var event2=scope.$broadcast("one");
-              expect(event.defaultPrevented).toBe(true);
-              expect(event2.defaultPrevented).toBe(true);
-          });
+            };
+            scope.$on("one", l);
+            var event = scope.$emit("one");
+            var event2 = scope.$broadcast("one");
+            expect(event.defaultPrevented).toBe(true);
+            expect(event2.defaultPrevented).toBe(true);
+        });
 
-          it('当scope销毁时触发$destroy事件', function() {
-              var l=jasmine.createSpy();
-              scope.$on("$destroy",l);
-              scope.$destroy();
-              expect(l).toHaveBeenCalled();
-          });
-          it('当scope时销毁时在child scope上触发$destroy事件', function() {
-               var l=jasmine.createSpy();
-              child.$on("$destroy",l);
-              scope.$destroy();
-              expect(l).toHaveBeenCalled();
-          });
+        it('当scope销毁时触发$destroy事件', function() {
+            var l = jasmine.createSpy();
+            scope.$on("$destroy", l);
+            scope.$destroy();
+            expect(l).toHaveBeenCalled();
+        });
+        it('当scope时销毁时在child scope上触发$destroy事件', function() {
+            var l = jasmine.createSpy();
+            child.$on("$destroy", l);
+            scope.$destroy();
+            expect(l).toHaveBeenCalled();
+        });
 
-          it('scope销毁后不再调用监听函数', function() {
-              var l=jasmine.createSpy();
-              scope.$on("one",l);
-              scope.$destroy();
-              scope.$emit('one');
-              expect(l).not.toHaveBeenCalled();
-          });
-          it('当调用$emit,$broadcast触发监听函数时,1个监听函数抛出异常不影响其他监听函数', function() {
-              var l1=function(event){
+        it('scope销毁后不再调用监听函数', function() {
+            var l = jasmine.createSpy();
+            scope.$on("one", l);
+            scope.$destroy();
+            scope.$emit('one');
+            expect(l).not.toHaveBeenCalled();
+        });
+        it('当调用$emit,$broadcast触发监听函数时,1个监听函数抛出异常不影响其他监听函数', function() {
+            var l1 = function(event) {
                 throw "l1 throwing an exception";
-              };
-              var l2=jasmine.createSpy();
-                var l3=jasmine.createSpy();
-              scope.$on('one',l1);
-              scope.$on('one',l2);
-              scope.$on('two',l1);
-              scope.$on('two',l3);
-              scope.$emit('one');
-              scope.$broadcast('two');
-              expect(l2).toHaveBeenCalled();
-              expect(l3).toHaveBeenCalled();
-          });
+            };
+            var l2 = jasmine.createSpy();
+            var l3 = jasmine.createSpy();
+            scope.$on('one', l1);
+            scope.$on('one', l2);
+            scope.$on('two', l1);
+            scope.$on('two', l3);
+            scope.$emit('one');
+            scope.$broadcast('two');
+            expect(l2).toHaveBeenCalled();
+            expect(l3).toHaveBeenCalled();
+        });
     });
 
 });

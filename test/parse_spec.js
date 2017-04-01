@@ -574,5 +574,13 @@ describe('parse', function() {
         var fn=parse('"hello"|surround:"*":"!"');
         expect(fn()).toEqual('*hello!');
     });
+
+    it('如果传入的参数是函数,直接返回此函数', function() {
+        var fnn=function(){};
+        expect(parse(fnn)).toBe(fnn);
+    });
+    it('不传入参数时返回默认函数', function() {
+        expect(parse()).toEqual(jasmine.any(Function));
+    });
 });
 

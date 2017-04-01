@@ -12,5 +12,16 @@ _.mixin({
         }
         var arr = new Array(times + 1);
         return arr.join(str);
+    },
+    startsWith: function(str, start) {
+        return str.charAt(0) === start;
+    },
+    toPlainObject:function(obj){
+        var o={};
+
+        for(var key in obj){
+            o[key]=obj[key];
+        }
+        return o;
     }
 });

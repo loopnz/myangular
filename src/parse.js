@@ -1,10 +1,20 @@
 /*jshint globalstrict:true*/
 /*global filter:false*/
 'use strict';
+
 function parse(expr) {
-    var lexer = new Lexer();
-    var parser = new Parser(lexer);
-    return parser.parse(expr);
+    switch (typeof expr) {
+        case 'string':
+            var lexer = new Lexer();
+            var parser = new Parser(lexer);
+            return parser.parse(expr);
+        case 'function':
+            return expr;
+        default:
+            return _.noop;
+    }
+
+
 }
 
 function Lexer() {
@@ -243,14 +253,14 @@ AST.prototype.program = function() {
 AST.prototype.filter = function() {
     var left = this.assignment();
     while (this.expect('|')) {
-        var args=[left];
+        var args = [left];
         left = {
             type: AST.CallExpression,
             callee: this.identifier(),
             arguments: args,
             filter: true
         };
-        while(this.expect(':')){
+        while (this.expect(':')) {
             args.push(this.assignment());
         }
     }
@@ -538,25 +548,25 @@ ASTCompiler.prototype.compile = function(text) {
         body: [],
         nextId: 0,
         vars: [],
-        filters:{}
+        filters: {}
     };
     this.recurse(ast);
-    var fnString = this.filterPrefix()+
-    'var fn=function(s,l){' +
+    var fnString = this.filterPrefix() +
+        'var fn=function(s,l){' +
         (this.state.vars.length ? 'var ' + this.state.vars.join(',') + ';' : '') + this.state.body.join('') + '};return fn;';
     /*jshint -W054*/
-    return new Function('ifDefined','filter',fnString)(ifDefined,filter);
+    return new Function('ifDefined', 'filter', fnString)(ifDefined, filter);
     /*jshint +W054*/
 };
 
-ASTCompiler.prototype.filterPrefix=function(){
-    if(_.isEmpty(this.state.filters)){
+ASTCompiler.prototype.filterPrefix = function() {
+    if (_.isEmpty(this.state.filters)) {
         return '';
-    }else{
-        var parts=_.map(this.state.filters,function(varName,filterName){
-            return varName+'='+'filter('+this.escape(filterName)+')';
-        },this);
-        return 'var '+parts.join(',')+";";
+    } else {
+        var parts = _.map(this.state.filters, function(varName, filterName) {
+            return varName + '=' + 'filter(' + this.escape(filterName) + ')';
+        }, this);
+        return 'var ' + parts.join(',') + ";";
     }
 };
 
@@ -638,10 +648,10 @@ ASTCompiler.prototype.recurse = function(ast, context, create) {
             var callContext, callee, args;
             if (ast.filter) {
                 callee = this.filter(ast.callee.name);
-                args=_.map(ast.arguments,function(arg){
+                args = _.map(ast.arguments, function(arg) {
                     return this.recurse(arg);
-                },this);
-                return callee + '('+args+')';
+                }, this);
+                return callee + '(' + args + ')';
             } else {
                 callContext = {};
                 callee = this.recurse(ast.callee, callContext);
@@ -696,9 +706,9 @@ ASTCompiler.prototype.recurse = function(ast, context, create) {
     }
 };
 
-ASTCompiler.prototype.filter=function(name){
-    if(!this.state.filters.hasOwnProperty('name')){
-        this.state.filters[name]=this.nextId(true);
+ASTCompiler.prototype.filter = function(name) {
+    if (!this.state.filters.hasOwnProperty('name')) {
+        this.state.filters[name] = this.nextId(true);
     }
     return this.state.filters[name];
 };
@@ -731,7 +741,7 @@ ASTCompiler.prototype.assign = function(id, value) {
 
 ASTCompiler.prototype.nextId = function(skip) {
     var id = 'v' + (this.state.nextId++);
-    if(!skip){
+    if (!skip) {
         this.state.vars.push(id);
     }
     return id;
@@ -758,6 +768,5 @@ function Parser(lexer) {
 }
 
 Parser.prototype.parse = function(text) {
-
     return this.astCompiler.compile(text);
 };
