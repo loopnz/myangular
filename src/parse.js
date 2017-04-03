@@ -538,12 +538,69 @@ function ifDefined(value, defaultValue) {
     }
 }
 
+function isLiteral(ast) {
+    return ast.body.length === 0 ||
+        ast.body.length === 1 && (
+            ast.body[0].type === AST.Literal ||
+            ast.body[0].type === AST.ArrayExpression ||
+            ast.body[0].type === AST.ObjectExpression
+        );
+}
+
+function markConstantExpressions(ast) {
+    var allConstants;
+    switch (ast.type) {
+        case AST.Program:
+            allConstants = true;
+            _.forEach(ast.body, function(expr) {
+                markConstantExpressions(expr);
+                allConstants = allConstants && expr.constant;
+            });
+            ast.constant = allConstants;
+            break;
+        case AST.Literal:
+            ast.constant = true;
+            break;
+        case AST.Identifier:
+            ast.constant=false;
+            break;
+        case AST.ArrayExpression:
+            allConstants = true;
+            _.forEach(ast.elements,function(element){
+                markConstantExpressions(element);
+                allConstants = allConstants&&element.constant;
+            });
+            ast.constant=allConstants;
+            break;
+        case AST.ObjectExpression:
+            allConstants = true;
+            _.forEach(ast.properties,function(property){
+                markConstantExpressions(property.value);
+                allConstants=allConstants&&property.value.constant;
+            });
+            ast.constant=allConstants;
+            break;
+        case AST.MemberExpression:
+            markConstantExpressions(ast.object);
+            if(ast.computed){
+                markConstantExpressions(ast.property);
+            }
+            ast.constant=ast.object.constant&&(!ast.computed||ast.property.constant);
+            break;
+        case AST.CallExpression:
+            ast.constant=false;
+            break;
+    }
+
+}
+
 function ASTCompiler(astBuilder) {
     this.astBuilder = astBuilder;
 }
 
 ASTCompiler.prototype.compile = function(text) {
     var ast = this.astBuilder.ast(text);
+    markConstantExpressions(ast);
     this.state = {
         body: [],
         nextId: 0,
@@ -555,8 +612,11 @@ ASTCompiler.prototype.compile = function(text) {
         'var fn=function(s,l){' +
         (this.state.vars.length ? 'var ' + this.state.vars.join(',') + ';' : '') + this.state.body.join('') + '};return fn;';
     /*jshint -W054*/
-    return new Function('ifDefined', 'filter', fnString)(ifDefined, filter);
+    var fn = new Function('ifDefined', 'filter', fnString)(ifDefined, filter);
     /*jshint +W054*/
+    fn.literal = isLiteral(ast);
+    fn.constant = ast.constant;
+    return fn;
 };
 
 ASTCompiler.prototype.filterPrefix = function() {

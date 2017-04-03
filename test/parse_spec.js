@@ -546,9 +546,9 @@ describe('parse', function() {
                 return str.toUpperCase();
             };
         });
-         register('exclamate', function() {
+        register('exclamate', function() {
             return function(str) {
-                return str+"!";
+                return str + "!";
             };
         });
         var fn = parse('a|upcase|exclamate');
@@ -556,31 +556,94 @@ describe('parse', function() {
     });
 
     it('给过滤器传递参数', function() {
-        register('repeat',function(){
-            return function(s,times){
-                return _.repeat(s,times);
-             };
+        register('repeat', function() {
+            return function(s, times) {
+                return _.repeat(s, times);
+            };
         });
-        var fn=parse('a|repeat:3');
-        expect(fn({a:'hello'})).toEqual('hellohellohello');
+        var fn = parse('a|repeat:3');
+        expect(fn({ a: 'hello' })).toEqual('hellohellohello');
     });
 
     it('可以给过滤器传递多个参数', function() {
-        register('surround',function(){
-            return function(str,left,right){
-                return left+str+right;
+        register('surround', function() {
+            return function(str, left, right) {
+                return left + str + right;
             };
         });
-        var fn=parse('"hello"|surround:"*":"!"');
+        var fn = parse('"hello"|surround:"*":"!"');
         expect(fn()).toEqual('*hello!');
     });
 
     it('如果传入的参数是函数,直接返回此函数', function() {
-        var fnn=function(){};
+        var fnn = function() {};
         expect(parse(fnn)).toBe(fnn);
     });
     it('不传入参数时返回默认函数', function() {
         expect(parse()).toEqual(jasmine.any(Function));
+    });
+
+    it('标记integer 字面量', function() {
+        var fn = parse('42');
+        expect(fn.literal).toBe(true);
+    });
+    it('标记字符串字面量', function() {
+        var fn = parse('"abc"');
+        expect(fn.literal).toBe(true);
+    });
+    it('标记布尔类型字面量', function() {
+        var fn = parse('true');
+        expect(fn.literal).toBe(true);
+    });
+    it('标记数组字面量', function() {
+        var fn = parse('[1,2,a]');
+        expect(fn.literal).toBe(true);
+    });
+
+    it('标记对象字面量', function() {
+        var fn = parse('{a:1,b:av}');
+        expect(fn.literal).toBe(true);
+    });
+
+    it('运算符标记literal为false', function() {
+        var fn = parse('!false');
+        expect(fn.literal).toBe(false);
+    });
+
+    it('标记算术运算符literal 为false', function() {
+        var fn = parse('1+2');
+        expect(fn.literal).toBe(false);
+    });
+
+    it('标记常量', function() {
+        var fn = parse('42');
+        expect(fn.constant).toBe(true);
+    });
+    it('标记字符串常量', function() {
+        var fn = parse('"abc"');
+        expect(fn.constant).toBe(true);
+    });
+    it('标记布尔常量', function() {
+        var fn = parse('true');
+        expect(fn.constant).toBe(true);
+    });
+
+    it('标记标识符的常量标记为false', function() {
+        var fn = parse('a');
+        expect(fn.constant).toBe(false);
+    });
+    it('当数组元素都是常量时标记constant', function() {
+        expect(parse('[1,2,3]').constant).toBe(true);
+        expect(parse('[1,[2,[3]]]').constant).toBe(true);
+        expect(parse('[1,2,a]').constant).toBe(false);
+        expect(parse('[1,[2,[a]]]').constant).toBe(false);
+    });
+
+    it('查找对象属性标记constant', function() {
+        expect(parse('{a:1}["a"]').constant).toBe(true);
+        expect(parse('obj["a"]').constant).toBe(false);
+        expect(parse('{a:1}[something]').constant).toBe(false);
+        expect(parse('obj[something]').constant).toBe(false);
     });
 });
 
