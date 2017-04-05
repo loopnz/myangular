@@ -645,5 +645,41 @@ describe('parse', function() {
         expect(parse('{a:1}[something]').constant).toBe(false);
         expect(parse('obj[something]').constant).toBe(false);
     });
-});
+    it('表达式有filter的时候根据参数判断是否constant', function() {
+        register('aFilter', function() {
+            return _.identity;
+        });
+        expect(parse('[1,2,3]|aFilter').constant).toBe(true);
+        expect(parse('[1,2,a]|aFilter').constant).toBe(false);
+        expect(parse('[1,2,3]|aFilter:42').constant).toBe(true);
+        expect(parse('[1,2,3]|aFilter:a').constant).toBe(false);
+    });
+    it('表达式是赋值表达式,且两边都是常量', function() {
+        expect(parse('1=2').constant).toBe(true);
+        expect(parse('a=2').constant).toBe(false);
+        expect(parse('1=b').constant).toBe(false);
+        expect(parse('a=b').constant).toBe(false);
+    });
 
+    it('如果一元运算符的参数是常量,标记为常量', function() {
+        expect(parse('+42').constant).toBe(true);
+        expect(parse('+a').constant).toBe(false);
+    });
+
+    it('允许表达式的assign方法对scope赋值', function() {
+        var fn=parse('anAttribute');
+        expect(fn.assign).toBeDefined();
+        var scope={};
+        fn.assign(scope,42);
+        expect(scope.anAttribute).toBe(42);
+    });
+
+    it('允许表达式的assign方法对scope赋值2', function() {
+        var fn=parse('anObject.anAttribute');
+        expect(fn.assign).toBeDefined();
+        var scope={};
+        fn.assign(scope,42);
+        expect(scope.anObject).toEqual({anAttribute:42});
+    });
+
+});

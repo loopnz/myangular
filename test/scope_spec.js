@@ -1,3 +1,6 @@
+/*jshint globalstrict:true*/
+/*global Scope:false,register:false*/
+'use strict';
 describe("Scope", function() {
 
     it("创建scope对象,scope就是普通js对象", function() {
@@ -1410,6 +1413,8 @@ describe("Scope", function() {
             scope.$digest();
             expect(oldValueGiven).toEqual({ a: 1, b: 2 });
         });
+
+
     });
 
     describe('Events', function() {
@@ -1674,6 +1679,98 @@ describe("Scope", function() {
             scope.$broadcast('two');
             expect(l2).toHaveBeenCalled();
             expect(l3).toHaveBeenCalled();
+        });
+    });
+
+    describe('优化脏检查', function() {
+        var scope;
+        beforeEach(function() {
+            scope = new Scope();
+        });
+
+        it('第一次脏检查后移除常量watcher', function() {
+            scope.$watch('[1,2,3]', function() {});
+            scope.$digest();
+            expect(scope.$$watchers.length).toBe(0);
+        });
+
+        it('识别单次绑定', function() {
+            var theValue;
+            scope.aValue = 42;
+            scope.$watch('::aValue', function(newValue) {
+                theValue = newValue;
+            });
+            scope.$digest();
+            expect(theValue).toBe(42);
+        });
+        it('第一次脏检查后移除单次绑定', function() {
+            scope.aValue = 42;
+            scope.$watch('::aValue', function() {});
+            scope.$digest();
+            expect(scope.$$watchers.length).toBe(0);
+        });
+
+        it('如果表达式的值仍旧是undefined,单次绑定不会删除watcher', function() {
+            scope.aValue=42;
+            scope.$watch('::aValue',function(){});
+            var un=scope.$watch('aValue',function(){
+                delete scope.aValue;
+            });
+            scope.$digest();
+            expect(scope.$$watchers.length).toBe(2);
+            scope.aValue=42;
+            un();
+            scope.$digest();
+            expect(scope.$$watchers.length).toBe(0);
+        });
+
+        it('如果表达式是数组或者对象,如果数组或对象内部的属性还有undefined的值,单次绑定不会删除watcher', function() {
+            scope.$watch('::[1,2,a]',function(){},true);
+            scope.$digest();
+            expect(scope.$$watchers.length).toBe(1);
+            scope.a=3;
+            scope.$digest();
+            expect(scope.$$watchers.length).toBe(0);
+        });
+
+        it('如果数组或对象内部属性未改变,不改变数组', function() {
+            var values=[];
+            scope.a=1;
+            scope.b=2;
+            scope.c=3;
+            scope.$watch('[a,b,c]',function(v){
+                values.push(v);
+            });
+            scope.$digest();
+            expect(values[0]).toEqual([1,2,3]);
+            expect(values.length).toBe(1);
+            scope.$digest();
+            expect(values.length).toBe(1);
+            scope.c=4;
+            scope.$digest();
+            expect(values.length).toBe(2);
+            expect(values[1]).toEqual([1,2,4]);
+        });
+
+        it('允许有状态的filter', function(done) {
+            register('withTime',function(){
+                return _.extend(function(v){
+                    return new Date().toISOString() +":"+ v;
+                },{
+                    $stateful:true
+                });
+            });
+            var listenerSpy=jasmine.createSpy();
+            scope.$watch('42|withTime',listenerSpy);
+            scope.$digest();
+            var first=listenerSpy.calls.mostRecent().args[0];
+            setTimeout(function(){
+                scope.$digest();
+                var second=listenerSpy.calls.mostRecent().args[0];
+                expect(second).not.toEqual(first);
+                done();   
+            }, 100);
+
         });
     });
 
