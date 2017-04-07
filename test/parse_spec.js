@@ -1,4 +1,14 @@
+/*jshint globalstrict:true*/
+/*global publishExternalAPI:false,createInjector:false*/
+'use strict';
 describe('parse', function() {
+
+    var parse;
+
+    beforeEach(function() {
+        publishExternalAPI();
+        parse = createInjector(['ng']).get('$parse');
+    });
 
     it('解析integer', function() {
         var fn = parse('42');
@@ -531,46 +541,59 @@ describe('parse', function() {
     });
 
     it('解析包含过滤器的表达式', function() {
-        register('upcase', function() {
-            return function(str) {
-                return str.toUpperCase();
-            };
-        });
+
+        parse = createInjector(['ng', function($filterProvider) {
+            $filterProvider.register('upcase', function() {
+                return function(str) {
+                    return str.toUpperCase();
+                };
+            });
+        }]).get('$parse');
         var fn = parse('a|upcase');
         expect(fn({ a: 'hello' })).toBe('HELLO');
     });
 
     it('解析串联的过滤器', function() {
-        register('upcase', function() {
-            return function(str) {
-                return str.toUpperCase();
-            };
-        });
-        register('exclamate', function() {
-            return function(str) {
-                return str + "!";
-            };
-        });
+
+
+        parse = createInjector(['ng', function($filterProvider) {
+            $filterProvider.register('upcase', function() {
+                return function(str) {
+                    return str.toUpperCase();
+                };
+            });
+            $filterProvider.register('exclamate', function() {
+                return function(str) {
+                    return str + "!";
+                };
+            });
+        }]).get('$parse');
+
         var fn = parse('a|upcase|exclamate');
         expect(fn({ a: 'hello' })).toBe('HELLO!');
     });
 
     it('给过滤器传递参数', function() {
-        register('repeat', function() {
-            return function(s, times) {
-                return _.repeat(s, times);
-            };
-        });
+        parse = createInjector(['ng', function($filterProvider) {
+            $filterProvider.register('repeat', function() {
+                return function(s, times) {
+                    return _.repeat(s, times);
+                };
+            });
+        }]).get('$parse');
         var fn = parse('a|repeat:3');
         expect(fn({ a: 'hello' })).toEqual('hellohellohello');
     });
 
     it('可以给过滤器传递多个参数', function() {
-        register('surround', function() {
-            return function(str, left, right) {
-                return left + str + right;
-            };
-        });
+
+        parse = createInjector(['ng', function($filterProvider) {
+            $filterProvider.register('surround', function() {
+                return function(str, left, right) {
+                    return left + str + right;
+                };
+            });
+        }]).get('$parse');
         var fn = parse('"hello"|surround:"*":"!"');
         expect(fn()).toEqual('*hello!');
     });
@@ -646,9 +669,12 @@ describe('parse', function() {
         expect(parse('obj[something]').constant).toBe(false);
     });
     it('表达式有filter的时候根据参数判断是否constant', function() {
-        register('aFilter', function() {
-            return _.identity;
-        });
+
+        parse = createInjector(['ng', function($filterProvider) {
+            $filterProvider.register('aFilter', function() {
+                return _.identity;
+            });
+        }]).get('$parse');
         expect(parse('[1,2,3]|aFilter').constant).toBe(true);
         expect(parse('[1,2,a]|aFilter').constant).toBe(false);
         expect(parse('[1,2,3]|aFilter:42').constant).toBe(true);
@@ -667,19 +693,19 @@ describe('parse', function() {
     });
 
     it('允许表达式的assign方法对scope赋值', function() {
-        var fn=parse('anAttribute');
+        var fn = parse('anAttribute');
         expect(fn.assign).toBeDefined();
-        var scope={};
-        fn.assign(scope,42);
+        var scope = {};
+        fn.assign(scope, 42);
         expect(scope.anAttribute).toBe(42);
     });
 
     it('允许表达式的assign方法对scope赋值2', function() {
-        var fn=parse('anObject.anAttribute');
+        var fn = parse('anObject.anAttribute');
         expect(fn.assign).toBeDefined();
-        var scope={};
-        fn.assign(scope,42);
-        expect(scope.anObject).toEqual({anAttribute:42});
+        var scope = {};
+        fn.assign(scope, 42);
+        expect(scope.anObject).toEqual({ anAttribute: 42 });
     });
 
 });

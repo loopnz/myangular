@@ -1,4 +1,4 @@
-var filters = {};
+/*var filters = {};
 
 function register(name, factory) {
     if (_.isObject(name)) {
@@ -14,7 +14,7 @@ function register(name, factory) {
 
 function filter(name) {
     return filters[name];
-}
+}*/
 
 
 function $FilterProvider($provide) {

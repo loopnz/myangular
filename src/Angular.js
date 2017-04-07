@@ -23,5 +23,11 @@ _.mixin({
             o[key]=obj[key];
         }
         return o;
+    },
+    camelCase:function(str){
+        var r=/-[a-zA-Z]/g;
+        return str.replace(r,function(letter){
+            return letter.charAt(1).toUpperCase();
+        });
     }
 });

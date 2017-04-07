@@ -17,4 +17,21 @@ describe('angular API', function() {
     	expect(injector.has('$filter')).toBe(true);
     });
 
+    it('安装parse服务', function() {
+    	publishExternalAPI();
+    	var injector=createInjector(['ng']);
+    	expect(injector.has('$parse')).toBe(true);
+    });
+
+    it('安装$rootScope服务', function() {
+        publishExternalAPI();
+        var injector=createInjector(['ng']);
+        expect(injector.has('$rootScope')).toBe(true);
+    });
+
+    it('安装$compile服务', function() {
+        publishExternalAPI();
+        var injector=createInjector(['ng']);
+        expect(injector.has('$compile')).toBe(true);
+    });
 });

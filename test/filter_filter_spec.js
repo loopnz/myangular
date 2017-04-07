@@ -1,12 +1,23 @@
 /*jshint globalstrict:true*/
-/*global filter:false,parse:false*/
+/*global publishExternalAPI:false,createInjector:false*/
 'use strict';
 
 describe('过滤器的过滤器(filter filter)', function() {
 
-    it('注册filter filter', function() {
-        expect(filter('filter')).toBeDefined();
+    var parse;
+       beforeEach(function() {
+            publishExternalAPI();
+            parse=createInjector(['ng']).get('$parse');
+        });
+
+    it('通过模块注册filter filter', function() {
+        var injector=createInjector(['ng']);
+        expect(injector.has('filterFilter')).toBe(true);
     });
+
+/*    it('注册filter filter', function() {
+        expect(filter('filter')).toBeDefined();
+    });*/
 
     it('使用断言函数过滤数组', function() {
         var fn = parse('[1,2,3,4]|filter:isOdd');
@@ -233,42 +244,44 @@ describe('过滤器的过滤器(filter filter)', function() {
     });
 
     it('使用通配符过滤基本数据结构', function() {
-    	var fn=parse('arr|filter:{$:"o"}');
-    	expect(fn({arr:['joe','jane','mary']})).toEqual(['joe']);
+        var fn = parse('arr|filter:{$:"o"}');
+        expect(fn({ arr: ['joe', 'jane', 'mary'] })).toEqual(['joe']);
     });
 
     it('使用多层通配符过滤', function() {
-    	var fn=parse('arr|filter:{$:{$:"o"}}');
-    	 var arr = [
+        var fn = parse('arr|filter:{$:{$:"o"}}');
+        var arr = [
             { name: { first: 'Joe' }, role: 'admin' },
             { name: { first: 'Jane' }, role: 'moderator' },
             { name: { first: 'mary' }, role: 'admin' }
         ];
 
-        expect(fn({arr:arr})).toEqual([
-        		 { name: { first: 'Joe' }, role: 'admin' }
-        	]);
+        expect(fn({ arr: arr })).toEqual([
+            { name: { first: 'Joe' }, role: 'admin' }
+        ]);
 
     });
 
     it('使用自定义的比较器', function() {
-    	var fn=parse('arr|filter:{$:"o"}:myComparator');
-    	expect(fn({
-    		arr:['o','ao','aa','oo'],
-    		myComparator:function(left,right){
-    			return left===right;
-    		}
-    	})).toEqual(['o']);
+        var fn = parse('arr|filter:{$:"o"}:myComparator');
+        expect(fn({
+            arr: ['o', 'ao', 'aa', 'oo'],
+            myComparator: function(left, right) {
+                return left === right;
+            }
+        })).toEqual(['o']);
     });
 
     it('比较的时候使用全等,也就是不要只匹配部分', function() {
-    	var fn=parse('arr|filter:{name:"Jo"}:true');
+        var fn = parse('arr|filter:{name:"Jo"}:true');
 
-    	expect(fn({arr:[
-    			{name:'Jo'},
-    			{name:'Joe'}
-    		]})).toEqual([{name:'Jo'}]);
-    	
+        expect(fn({
+            arr: [
+                { name: 'Jo' },
+                { name: 'Joe' }
+            ]
+        })).toEqual([{ name: 'Jo' }]);
+
     });
 
 });

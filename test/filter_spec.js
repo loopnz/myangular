@@ -1,10 +1,13 @@
+/*jshint globalstrict:true*/
+/*global angular:false,publishExternalAPI:false,createInjector:false*/
+'use strict';
 describe('过滤器filter', function() {
 
     beforeEach(function() {
         publishExternalAPI();
     });
 
-    it('注册过滤器', function() {
+/*   it('注册过滤器', function() {
         var myFilter = function() {};
         var myFilterFactory = function() {
             return myFilter;
@@ -28,7 +31,7 @@ describe('过滤器filter', function() {
         });
         expect(filter('my')).toBe(myFilter);
         expect(filter('my2')).toBe(myFilter2);
-    });
+    });*/
 
     it('使用模块注册过滤器', function() {
         var myFilter = function() {};

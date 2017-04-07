@@ -1,20 +1,17 @@
 /*jshint globalstrict:true*/
-/*global Scope:false,register:false*/
+/*global publishExternalAPI:false,createInjector:false*/
 'use strict';
 describe("Scope", function() {
 
-    it("创建scope对象,scope就是普通js对象", function() {
-        var scope = new Scope();
-        scope.aProperty = 1;
-        expect(scope.aProperty).toBe(1);
-    });
 
     describe("digest", function() {
 
         var scope;
 
         beforeEach(function() {
-            scope = new Scope();
+            publishExternalAPI();
+            var injector = createInjector(['ng']);
+            scope = injector.get('$rootScope');
         });
 
         it("calls the listener function of a watch on first $digest", function() {
@@ -656,8 +653,11 @@ describe("Scope", function() {
     describe('$watchGroup', function() {
         var scope;
         beforeEach(function() {
-            scope = new Scope();
+            publishExternalAPI();
+            var injector = createInjector(['ng']);
+            scope = injector.get('$rootScope');
         });
+
 
         it('takes watches as an array and calls listener with arrays', function() {
             var gotNewValues, gotOldValues;
@@ -759,23 +759,28 @@ describe("Scope", function() {
     });
 
     describe('inheritance', function() {
+        var parent;
+
+        beforeEach(function() {
+            publishExternalAPI();
+            var injector = createInjector(['ng']);
+            parent = injector.get('$rootScope');
+        });
+
 
         it('inherits the parent properties', function() {
-            var parent = new Scope();
             parent.aValue = [1, 2, 3];
             var child = parent.$new();
             expect(child.aValue).toEqual([1, 2, 3]);
         });
 
         it('does not cause a parent to inherit its properties', function() {
-            var parent = new Scope();
             var child = parent.$new();
             child.aValue = [1, 2, 3];
             expect(parent.aValue).toBeUndefined();
         });
 
         it('inherits the parent properties whenevet they are defined ', function() {
-            var parent = new Scope();
             var child = parent.$new();
             parent.aValue = [1, 2, 3];
             expect(child.aValue).toEqual([1, 2, 3]);
@@ -783,7 +788,6 @@ describe("Scope", function() {
         });
 
         it('can manipulate a parent socpe property ', function() {
-            var parent = new Scope();
             var child = parent.$new();
             parent.aValue = [1, 2, 3];
             child.aValue.push(4);
@@ -792,7 +796,6 @@ describe("Scope", function() {
         });
 
         it('can watch a property in the parent', function() {
-            var parent = new Scope();
             var child = parent.$new();
             parent.aValue = [1, 2, 3];
             child.counter = 0;
@@ -810,7 +813,7 @@ describe("Scope", function() {
         });
 
         it('can be nested at any depth', function() {
-            var a = new Scope();
+            var a = parent;
             var aa = a.$new();
             var aaa = aa.$new();
             var aab = aa.$new();
@@ -829,7 +832,6 @@ describe("Scope", function() {
         });
 
         it('shadows a parent property with the same name', function() {
-            var parent = new Scope();
             var child = parent.$new();
             parent.name = 'joe';
             child.name = 'jill';
@@ -837,7 +839,6 @@ describe("Scope", function() {
             expect(child.name).toBe('jill');
         });
         it('does not shadow members of parent scope attributes', function() {
-            var parent = new Scope();
             var child = parent.$new();
             parent.user = { name: 'joe' };
             child.user.name = 'jill';
@@ -846,7 +847,6 @@ describe("Scope", function() {
         });
 
         it('does not digest its parents', function() {
-            var parent = new Scope();
             var child = parent.$new();
             parent.aValue = 'abc';
             parent.$watch(function(scope) {
@@ -860,7 +860,6 @@ describe("Scope", function() {
         });
 
         it('keeps a record of its children', function() {
-            var parent = new Scope();
             var child1 = parent.$new();
             var child2 = parent.$new();
             var child2_1 = child2.$new();
@@ -874,7 +873,6 @@ describe("Scope", function() {
         });
 
         it('digests its children', function() {
-            var parent = new Scope();
             var child = parent.$new();
             parent.aValue = 'abc';
             child.$watch(function(scope) {
@@ -889,7 +887,6 @@ describe("Scope", function() {
         });
 
         it('deigests from root on $apply', function() {
-            var parent = new Scope();
             var child = parent.$new();
             var child2 = child.$new();
 
@@ -910,8 +907,6 @@ describe("Scope", function() {
 
 
         it('schedules a digest from root on $evalAsync', function(done) {
-
-            var parent = new Scope();
             var child = parent.$new();
             var child2 = child.$new();
 
@@ -934,7 +929,6 @@ describe("Scope", function() {
         });
 
         it('does not have access to parent attributes when isolated', function() {
-            var parent = new Scope();
             var child = parent.$new(true);
 
             parent.aValue = 'abc';
@@ -944,7 +938,6 @@ describe("Scope", function() {
         });
 
         it('cannot watch parent attributes when ioslated', function() {
-            var parent = new Scope();
             var child = parent.$new(true);
             parent.aValue = 'abc';
             child.$watch(function(scope) {
@@ -958,7 +951,6 @@ describe("Scope", function() {
         });
 
         it('digests its isolated children', function() {
-            var parent = new Scope();
             var child = parent.$new(true);
             child.aValue = 'abc';
             child.$watch(function(scope) {
@@ -972,7 +964,6 @@ describe("Scope", function() {
         });
 
         it('digests from root on $apply when isolated', function() {
-            var parent = new Scope();
             var child = parent.$new(true);
             var child2 = child.$new();
 
@@ -991,7 +982,6 @@ describe("Scope", function() {
         });
 
         it('schedules a digest from root on $evalAsync when isolated', function(done) {
-            var parent = new Scope();
             var child = parent.$new(true);
             var child2 = child.$new();
 
@@ -1012,7 +1002,6 @@ describe("Scope", function() {
         });
 
         it('执行 $evalAsync 在 isolated scope内', function(done) {
-            var parent = new Scope();
             var child = parent.$new(true);
             child.$evalAsync(function(scope) {
                 scope.didEvalAsync = true;
@@ -1026,7 +1015,6 @@ describe("Scope", function() {
         });
 
         it('执行$$postDigest 在isolated scope内', function() {
-            var parent = new Scope();
             var child = parent.$new(true);
             child.$$postDigest(function(scope) {
                 child.didPostDigest = true;
@@ -1039,8 +1027,8 @@ describe("Scope", function() {
         });
 
         it('创建子scope时使用指定的父级scope', function() {
-            var prototypeParent = new Scope();
-            var hierarchyParent = new Scope();
+            var prototypeParent = parent.$new();
+            var hierarchyParent = parent.$new();
             var child = prototypeParent.$new(false, hierarchyParent);
 
             prototypeParent.a = 42;
@@ -1058,7 +1046,6 @@ describe("Scope", function() {
         });
 
         it('使用$destroy方法销毁scope', function() {
-            var parent = new Scope();
             var child = parent.$new();
             child.aValue = [1, 2, 3];
             child.counter = 0;
@@ -1085,8 +1072,11 @@ describe("Scope", function() {
 
     describe('$watchCollection', function() {
         var scope;
+
         beforeEach(function() {
-            scope = new Scope();
+            publishExternalAPI();
+            var injector = createInjector(['ng']);
+            scope = injector.get('$rootScope');
         });
 
         it('$watchCollection监测非对象和非数组', function() {
@@ -1423,7 +1413,9 @@ describe("Scope", function() {
         var child;
         var isolatedChild;
         beforeEach(function() {
-            parent = new Scope();
+            publishExternalAPI();
+            var injector = createInjector(['ng']);
+            parent = injector.get('$rootScope');
             scope = parent.$new();
             child = scope.$new();
             isolatedChild = scope.$new(true);
@@ -1685,7 +1677,9 @@ describe("Scope", function() {
     describe('优化脏检查', function() {
         var scope;
         beforeEach(function() {
-            scope = new Scope();
+            publishExternalAPI();
+            var injector = createInjector(['ng']);
+            scope = injector.get('$rootScope');
         });
 
         it('第一次脏检查后移除常量watcher', function() {
@@ -1711,67 +1705,105 @@ describe("Scope", function() {
         });
 
         it('如果表达式的值仍旧是undefined,单次绑定不会删除watcher', function() {
-            scope.aValue=42;
-            scope.$watch('::aValue',function(){});
-            var un=scope.$watch('aValue',function(){
+            scope.aValue = 42;
+            scope.$watch('::aValue', function() {});
+            var un = scope.$watch('aValue', function() {
                 delete scope.aValue;
             });
             scope.$digest();
             expect(scope.$$watchers.length).toBe(2);
-            scope.aValue=42;
+            scope.aValue = 42;
             un();
             scope.$digest();
             expect(scope.$$watchers.length).toBe(0);
         });
 
         it('如果表达式是数组或者对象,如果数组或对象内部的属性还有undefined的值,单次绑定不会删除watcher', function() {
-            scope.$watch('::[1,2,a]',function(){},true);
+            scope.$watch('::[1,2,a]', function() {}, true);
             scope.$digest();
             expect(scope.$$watchers.length).toBe(1);
-            scope.a=3;
+            scope.a = 3;
             scope.$digest();
             expect(scope.$$watchers.length).toBe(0);
         });
 
         it('如果数组或对象内部属性未改变,不改变数组', function() {
-            var values=[];
-            scope.a=1;
-            scope.b=2;
-            scope.c=3;
-            scope.$watch('[a,b,c]',function(v){
+            var values = [];
+            scope.a = 1;
+            scope.b = 2;
+            scope.c = 3;
+            scope.$watch('[a,b,c]', function(v) {
                 values.push(v);
             });
             scope.$digest();
-            expect(values[0]).toEqual([1,2,3]);
+            expect(values[0]).toEqual([1, 2, 3]);
             expect(values.length).toBe(1);
             scope.$digest();
             expect(values.length).toBe(1);
-            scope.c=4;
+            scope.c = 4;
             scope.$digest();
             expect(values.length).toBe(2);
-            expect(values[1]).toEqual([1,2,4]);
+            expect(values[1]).toEqual([1, 2, 4]);
         });
 
         it('允许有状态的filter', function(done) {
-            register('withTime',function(){
-                return _.extend(function(v){
-                    return new Date().toISOString() +":"+ v;
-                },{
-                    $stateful:true
+
+            var injector=createInjector(['ng', function($filterProvider) {
+                $filterProvider.register('withTime', function() {
+                    return _.extend(function(v) {
+                        return new Date().toISOString() + ":" + v;
+                    }, {
+                        $stateful: true
+                    });
                 });
-            });
-            var listenerSpy=jasmine.createSpy();
-            scope.$watch('42|withTime',listenerSpy);
+            }]);
+            var scope=injector.get('$rootScope');
+            var listenerSpy = jasmine.createSpy();
+            scope.$watch('42|withTime', listenerSpy);
             scope.$digest();
-            var first=listenerSpy.calls.mostRecent().args[0];
-            setTimeout(function(){
+            var first = listenerSpy.calls.mostRecent().args[0];
+            setTimeout(function() {
                 scope.$digest();
-                var second=listenerSpy.calls.mostRecent().args[0];
+                var second = listenerSpy.calls.mostRecent().args[0];
                 expect(second).not.toEqual(first);
-                done();   
+                done();
             }, 100);
 
         });
+    });
+
+    describe('设置脏检查短路次数', function() {
+        
+        beforeEach(function() {
+            publishExternalAPI();
+        });
+
+        it('设置短路次数', function() {
+            var injector=createInjector(['ng',function($rootScopeProvider){
+                $rootScopeProvider.digestTtl(5);
+            }]);
+            var scope=injector.get("$rootScope");
+            scope.countA=0;
+            scope.countB=0;
+            scope.$watch(function(scope){
+                return scope.countA;
+            },function(newValue,oldValue,scope){
+                if(scope.countB<5){
+                    scope.countB++;
+                }
+            });
+
+            scope.$watch(function(scope){
+                return scope.countB;
+            },function(newValue,oldValue,scope){
+                scope.countA++;
+            });
+
+            expect(function(){
+                scope.$digest();
+            }).toThrow();
+        });
+
     });
 
 });
