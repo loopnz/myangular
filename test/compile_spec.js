@@ -525,13 +525,13 @@ describe('指令(directive)--$compile', function() {
     });
 
     it('允许指令覆盖多个同辈dom元素', function() {
-    	 var compileEl = [];
+        var compileEl = [];
         var my = window.angular.module('myModule', []);
         my.directive('myDir', function() {
             return {
-                multiElement:true,
+                multiElement: true,
                 compile: function(element) {
-                    compileEl=element;
+                    compileEl = element;
                 }
             };
         });
@@ -543,9 +543,402 @@ describe('指令(directive)--$compile', function() {
         });
     });
 
+
     describe('指令的属性', function() {
-    	
+
+        function registerAndCompile(dirName, domStr, callback) {
+            var givenAttrs;
+            var injector = makeInjectorWithDirectives(dirName, function() {
+                return {
+                    restrict: 'EACM',
+                    compile: function(element, attrs) {
+                        givenAttrs = attrs;
+                    }
+                };
+            });
+            injector.invoke(function($compile, $rootScope) {
+                var el = $(domStr);
+                $compile(el);
+                callback(el, givenAttrs, $rootScope);
+            });
+        }
+
+
+        it('将dom元素的属性作为参数传递给compile函数', function() {
+            var my = window.angular.module('myModule', []);
+            my.directive('myDir', function() {
+                return {
+                    restrict: 'E',
+                    compile: function(element, attrs) {
+                        element.data('givenAttrs', attrs);
+                    }
+                };
+            });
+            var injector = createInjector(['ng', 'myModule']);
+            injector.invoke(function($compile) {
+                var el = $('<my-dir my-attr="1" my-other-attr="2"></my-dir>');
+                $compile(el);
+                expect(el.data('givenAttrs').myAttr).toEqual('1');
+                expect(el.data('givenAttrs').myOtherAttr).toEqual('2');
+            });
+        });
+
+        it('设置布尔类型的属性值为true', function() {
+            registerAndCompile('myDirective', '<input my-directive disabled>', function(element, attrs) {
+                expect(attrs.disabled).toBe(true);
+            });
+        });
+
+        it('使用带有ng-attr前缀的属性值替代原来的值', function() {
+            registerAndCompile('myDirective', '<input my-directive ng-attr-what="42" what="41">', function(element, attrs) {
+                expect(attrs.what).toBe("42");
+            });
+        });
+
+        it('允许设置属性', function() {
+            registerAndCompile('myDirective', '<input my-directive attr="true">', function(element, attrs) {
+                attrs.$set('attr', 'false');
+                expect(attrs.attr).toBe("false");
+            });
+        });
+        it('允许设置属性,并绑定dom', function() {
+            registerAndCompile('myDirective', '<input my-directive attr="true">', function(element, attrs) {
+                attrs.$set('attr', 'false');
+                expect(element.attr('attr')).toBe("false");
+            });
+        });
+
+        it('当参数flag为FALSE时不设置dom属性', function() {
+            registerAndCompile('myDirective', '<input my-directive attr="true">', function(element, attrs) {
+                attrs.$set('attr', 'false', false);
+                expect(element.attr('attr')).toBe("true");
+            });
+        });
+        it('指令间共享属性', function() {
+            var attrs1, attrs2;
+            var injector = makeInjectorWithDirectives({
+                firstDirective: function() {
+                    return {
+                        priority: 1,
+                        compile: function(element, attrs) {
+                            attrs1 = attrs;
+                        }
+                    };
+                },
+                secondDirective: function() {
+                    return {
+                        priority: 1,
+                        compile: function(element, attrs) {
+                            attrs2 = attrs;
+                        }
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div second-directive first-directive ></div>');
+                $compile(el);
+                expect(attrs1).toBe(attrs2);
+            });
+        });
+
+        it('观察属性变化', function() {
+            registerAndCompile('myDirective', '<input my-directive attr="42">', function(element, attrs) {
+                var gotValue;
+                attrs.$observe('attr', function(value) {
+                    gotValue = value;
+                });
+                attrs.$set('attr', '43');
+                expect(gotValue).toEqual('43');
+            });
+        });
+
+        it('在注册属性变化函数后再下一次digest中调用函数', function() {
+            registerAndCompile('myDirective', '<input my-directive attr="42">', function(element, attrs, $rootScope) {
+                var gotValue;
+                attrs.$observe('attr', function(value) {
+                    gotValue = value;
+                });
+                $rootScope.$digest();
+                expect(gotValue).toEqual('42');
+            });
+        });
+
+        it('注销属性监控函数', function() {
+            registerAndCompile('myDirective', '<input my-directive attr="43">', function(element, attrs, $rootScope) {
+                var gotValue;
+                var remove = attrs.$observe('attr', function(value) {
+                    gotValue = value;
+                });
+                attrs.$set('attr', 43);
+                expect(gotValue).toEqual(43);
+                remove();
+                attrs.$set('attr', 44);
+                expect(gotValue).toBe(43);
+            });
+        });
+
+        it('将class的值(如果是指令)也添加进属性值', function() {
+            registerAndCompile('myDirective', '<input class="my-directive">', function(element, attrs, $rootScope) {
+                expect(attrs.hasOwnProperty('myDirective')).toBe(true);
+            });
+        });
+
+        it('将class的值(如果不是指令)不添加进属性值', function() {
+            registerAndCompile('myDirective', '<input my-directive class="some">', function(element, attrs, $rootScope) {
+                expect(attrs.hasOwnProperty('some')).toBe(false);
+            });
+        });
+
+        it('给class类型的指令传递参数', function() {
+            registerAndCompile('myDirective', '<input  class="my-directive:my attribute">', function(element, attrs, $rootScope) {
+                expect(attrs.myDirective).toEqual("my attribute");
+            });
+        });
+
+        it('给class类型的指令传递参数,参数在分号处终止', function() {
+            registerAndCompile('myDirective', '<input  class="my-directive:my attribute;some-other-class">', function(element, attrs, $rootScope) {
+                expect(attrs.myDirective).toEqual("my attribute");
+            });
+        });
+
+        it('将注释的值(如果是指令)也添加进属性值', function() {
+            registerAndCompile('myDirective', '<!-- directive:my-directive and the attribute value  -->', function(element, attrs, $rootScope) {
+                expect(attrs.hasOwnProperty('myDirective')).toBe(true);
+                expect(attrs.myDirective).toEqual('and the attribute value');
+            });
+        });
+
+        it('允许添加classes', function() {
+            registerAndCompile('myDirective', '<my-directive></my-directive>', function(element, attrs, $rootScope) {
+                attrs.$addClass('some-class');
+                expect(element.hasClass('some-class')).toBe(true);
+            });
+        });
+
+        it('允许移除classes', function() {
+            registerAndCompile('myDirective', '<my-directive class="some-class"></my-directive>', function(element, attrs, $rootScope) {
+                attrs.$removeClass('some-class');
+                expect(element.hasClass('some-class')).toBe(false);
+            });
+        });
+
+
+        it('允许更新classes', function() {
+            registerAndCompile('myDirective', '<my-directive class="one three four"></my-directive>', function(element, attrs, $rootScope) {
+                attrs.$updateClass('one two three', 'one three four');
+                expect(element.hasClass('one')).toBe(true);
+                expect(element.hasClass('two')).toBe(true);
+                expect(element.hasClass('three')).toBe(true);
+                expect(element.hasClass('four')).toBe(false);
+            });
+        });
+    });
+
+    it('在compile函数中返回公共link函数', function() {
+        var injector = makeInjectorWithDirectives('myDirective', function() {
+            return {
+                compile: _.noop
+            };
+        });
+        injector.invoke(function($compile) {
+            var el = $('<div my-directive></div>');
+            var linkFn = $compile(el);
+            expect(linkFn).toBeDefined();
+            expect(_.isFunction(linkFn)).toBe(true);
+        });
+    });
+
+    describe('指令链接linking', function() {
+
+        it('传递任意一个scope对象作为link函数参数', function() {
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    compile: _.noop
+                };
+            });
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-directive></div>');
+                $compile(el)($rootScope);
+                expect(el.data('$scope')).toBe($rootScope);
+            });
+        });
+
+        it('调用指令的link函数(传入scope对象)', function() {
+            var givenScope, givenElement, givenAttrs;
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    compile: function(element, attrs) {
+
+                        return function(scope, element, attrs) {
+                            givenScope = scope;
+                            givenElement = element;
+                            givenAttrs = attrs;
+                        };
+                    }
+                };
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-directive></div>');
+                $compile(el)($rootScope);
+                expect(givenScope).toBe($rootScope);
+                expect(givenElement[0]).toBe(el[0]);
+                expect(givenAttrs).toBeDefined();
+                expect(givenAttrs.myDirective).toBeDefined();
+            });
+
+        });
+
+        it('使用定义在指令对象内的link函数', function() {
+
+            var givenScope, givenElement, givenAttrs;
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    link: function(scope, element, attrs) {
+                        givenScope = scope;
+                        givenElement = element;
+                        givenAttrs = attrs;
+                    }
+                };
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-directive></div>');
+                $compile(el)($rootScope);
+                expect(givenScope).toBe($rootScope);
+                expect(givenElement[0]).toBe(el[0]);
+                expect(givenAttrs).toBeDefined();
+                expect(givenAttrs.myDirective).toBeDefined();
+            });
+        });
+
+        it('先执行子元素的link函数', function() {
+            var givenElements = [];
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    link: function(scope, element, attrs) {
+                        givenElements.push(element);
+                    }
+                };
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-directive><div my-directive></div></div>');
+                $compile(el)($rootScope);
+                expect(givenElements.length).toBe(2);
+                expect(givenElements[0][0]).toBe(el[0].firstChild);
+                expect(givenElements[1][0]).toBe(el[0]);
+            });
+        });
+
+        it('执行子元素的link函数(父元素没有指令的情况下)', function() {
+            var givenElements = [];
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    link: function(scope, element, attrs) {
+                        givenElements.push(element);
+                    }
+                };
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div><div my-directive></div></div>');
+                $compile(el)($rootScope);
+                expect(givenElements.length).toBe(1);
+                expect(givenElements[0][0]).toBe(el[0].firstChild);
+            });
+        });
+
+
+        it('支持link是对象的情况', function() {
+            var linked;
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    link: {
+                        post: function(scope, element, attrs) {
+                            linked = true;
+                        }
+                    }
+                };
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div><div my-directive></div></div>');
+                $compile(el)($rootScope);
+                expect(linked).toBe(true);
+            });
+        });
+
+        it('支持link是对象的情况(prelinking and postlinking)', function() {
+            var linkings = [];
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    link: {
+                        pre: function(scope, element, attrs) {
+                            linkings.push(['pre', element[0]]);
+                        },
+                        post: function(scope, element, attrs) {
+                            linkings.push(['post', element[0]]);
+                        }
+                    }
+                };
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-directive><div my-directive></div></div>');
+                $compile(el)($rootScope);
+                expect(linkings.length).toBe(4);
+                expect(linkings[0]).toEqual(['pre', el[0]]);
+                expect(linkings[1]).toEqual(['pre', el[0].firstChild]);
+                expect(linkings[2]).toEqual(['post', el[0].firstChild]);
+                expect(linkings[3]).toEqual(['post', el[0]]);
+            });
+        });
+
+        it('支持link是对象的情况(反转postlinking的优先级顺序)', function() {
+            var linkings = [];
+            var injector = makeInjectorWithDirectives({
+                firstDirective: function() {
+                    return {
+                    	priority:2,
+                        link: {
+                            pre: function(scope, element, attrs) {
+                                linkings.push('first-pre');
+                            },
+                            post: function(scope, element, attrs) {
+                                linkings.push('first-post');
+                            }
+                        }
+                    };
+                },
+                secondDirective: function() {
+                    return {
+                    	priority:1,
+                        link: {
+                            pre: function(scope, element, attrs) {
+                                linkings.push('second-pre');
+                            },
+                            post: function(scope, element, attrs) {
+                                linkings.push('second-post');
+                            }
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div first-directive second-directive></div>');
+                $compile(el)($rootScope);
+                expect(linkings).toEqual([
+                		'first-pre',
+                		'second-pre',
+                		'second-post',
+                		'first-post'
+                	]);
+            });
+        });
+
+
+
     });
 });
-
-
