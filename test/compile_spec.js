@@ -900,7 +900,7 @@ describe('指令(directive)--$compile', function() {
             var injector = makeInjectorWithDirectives({
                 firstDirective: function() {
                     return {
-                    	priority:2,
+                        priority: 2,
                         link: {
                             pre: function(scope, element, attrs) {
                                 linkings.push('first-pre');
@@ -913,7 +913,7 @@ describe('指令(directive)--$compile', function() {
                 },
                 secondDirective: function() {
                     return {
-                    	priority:1,
+                        priority: 1,
                         link: {
                             pre: function(scope, element, attrs) {
                                 linkings.push('second-pre');
@@ -930,14 +930,239 @@ describe('指令(directive)--$compile', function() {
                 var el = $('<div first-directive second-directive></div>');
                 $compile(el)($rootScope);
                 expect(linkings).toEqual([
-                		'first-pre',
-                		'second-pre',
-                		'second-post',
-                		'first-post'
-                	]);
+                    'first-pre',
+                    'second-pre',
+                    'second-post',
+                    'first-post'
+                ]);
             });
         });
 
+        it('保存dom节点顺序,保证编译与链接的dom节点相同', function() {
+
+            var givenElements = [];
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    link: function(scope, element, attrs) {
+                        givenElements.push(element[0]);
+                        element.after('<div></div>');
+                    }
+                };
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div><div my-directive></div><div my-directive></div></div>');
+                var el1 = el[0].childNodes[0];
+                var el2 = el[0].childNodes[1];
+                $compile(el)($rootScope);
+                expect(givenElements.length).toBe(2);
+                expect(givenElements[0]).toBe(el1);
+                expect(givenElements[1]).toBe(el2);
+            });
+        });
+
+        it('多个同辈元素的指令链接', function() {
+
+            var givenElements = [];
+            var injector = makeInjectorWithDirectives('myDir', function() {
+                return {
+                    multiElement: true,
+                    link: function(scope, element, attrs) {
+                        givenElements = element;
+                    }
+                };
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir-start></div><div></div><div my-dir-end></div>');
+                $compile(el)($rootScope);
+                expect(givenElements.length).toBe(3);
+            });
+        });
+
+        it('在指令中创建新的scope', function() {
+            var givenScope = [];
+            var injector = makeInjectorWithDirectives('myDir', function() {
+                return {
+                    scope: true,
+                    link: function(scope, element, attrs) {
+                        givenScope = scope;
+                    }
+                };
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir></div>');
+                $compile(el)($rootScope);
+                expect(givenScope.$parent).toBe($rootScope);
+            });
+        });
+
+        it('单个元素上有多个指令,其中1个指令创建的scope在其余指令间共享', function() {
+            var givenScope = [];
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        scope: true
+                    };
+                },
+                myOir: function() {
+                    return {
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir my-oir></div>');
+                $compile(el)($rootScope);
+                expect(givenScope.$parent).toBe($rootScope);
+            });
+        });
+
+        it('创建scope时给元素添加ng-scope类,存储scope', function() {
+            var givenScope = [];
+            var injector = makeInjectorWithDirectives('myDir', function() {
+                return {
+                    scope: true,
+                    link: function(scope, element, attrs) {
+                        givenScope = scope;
+                    }
+                };
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir></div>');
+                $compile(el)($rootScope);
+                expect(el.hasClass('ng-scope')).toBe(true);
+                expect(el.data('$scope')).toBe(givenScope);
+            });
+        });
+
+        it('在指令中创建ioslate scope', function() {
+            var givenScope;
+            var injector = makeInjectorWithDirectives('myDir', function() {
+                return {
+                    scope: {},
+                    link: function(scope, element, attrs) {
+                        givenScope = scope;
+                    }
+                };
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir></div>');
+                $compile(el)($rootScope);
+                expect(givenScope.$parent).toBe($rootScope);
+                expect(Object.getPrototypeOf(givenScope)).not.toBe($rootScope);
+            });
+
+        });
+
+        it('多个指令在同一个元素时,指令的isolate scope不在指令间共享', function() {
+            var givenScope;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {}
+                    };
+                },
+                'myOir': function() {
+                    return {
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir my-oir></div>');
+                $compile(el)($rootScope);
+                expect(givenScope).toBe($rootScope);
+            });
+        });
+
+        it('指令的isolate scope不会应用到子元素上', function() {
+            var givenScope;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {}
+                    };
+                },
+                'myOir': function() {
+                    return {
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir><div my-oir></div></div>');
+                $compile(el)($rootScope);
+                expect(givenScope).toBe($rootScope);
+            });
+        });
+
+
+        it('不允许2个都需要isolate scope的指令同时作用在1个元素上', function() {
+            var givenScope;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {}
+                    };
+                },
+                'myOir': function() {
+                    return {
+                        scope: {},
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir  my-oir><div></div></div>');
+
+                expect(function() {
+                    $compile(el);
+                }).toThrow();
+            });
+        });
+
+        it('不允许需要isolate scope的指令和需要新建scope的指令同时作用在1个元素上', function() {
+            var givenScope;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: true
+                    };
+                },
+                'myOir': function() {
+                    return {
+                        scope: {},
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir  my-oir><div></div></div>');
+
+                expect(function() {
+                    $compile(el);
+                }).toThrow();
+            });
+        });
 
 
     });
