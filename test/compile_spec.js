@@ -1164,6 +1164,303 @@ describe('指令(directive)--$compile', function() {
             });
         });
 
+        it('isolate scope 使用@单向继承属性', function() {
+            var givenScope, givenAttrs;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {
+                            anAttr: '@'
+                        },
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                            givenAttrs = attrs;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir></div>');
+                $compile(el)($rootScope);
+                givenAttrs.$set('anAttr', '42');
+                expect(givenScope.anAttr).toBe('42');
+            });
+
+        });
+        it('isolate scope 使用@单向继承属性2', function() {
+            var givenScope, givenAttrs;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {
+                            anAttr: '@'
+                        },
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir an-attr="42"></div>');
+                $compile(el)($rootScope);
+                expect(givenScope.anAttr).toBe('42');
+            });
+        });
+
+        it('isolate scope 使用@单向继承属性3(使用别名)', function() {
+            var givenScope, givenAttrs;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {
+                            anAttr: '@anAttr2'
+                        },
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir an-attr2="42"></div>');
+                $compile(el)($rootScope);
+                expect(givenScope.anAttr).toBe('42');
+            });
+        });
+
+        it('isolate scope 使用=双向绑定属性', function() {
+            var givenScope, givenAttrs;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {
+                            anAttr: '='
+                        },
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                            givenAttrs = attrs;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir an-attr="42"></div>');
+                $compile(el)($rootScope);
+                expect(givenScope.anAttr).toBe(42);
+            });
+        });
+
+
+        it('isolate scope 使用=双向绑定属性(使用别名)', function() {
+            var givenScope, givenAttrs;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {
+                            anAttr: '=anAttr2'
+                        },
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                            givenAttrs = attrs;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir an-attr2="42"></div>');
+                $compile(el)($rootScope);
+                expect(givenScope.anAttr).toBe(42);
+            });
+        });
+
+        it('isolate scope 使用=双向绑定属性(允许属性使用表达式计算)', function() {
+            var givenScope, givenAttrs;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {
+                            anAttr: '='
+                        },
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                            givenAttrs = attrs;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                $rootScope.parentArr = 41;
+                var el = $('<div my-dir an-attr="parentArr+1"></div>');
+                $compile(el)($rootScope);
+                expect(givenScope.anAttr).toBe(42);
+            });
+        });
+
+        it('isolate scope 使用=双向绑定属性(监控属性变化)', function() {
+            var givenScope, givenAttrs;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {
+                            anAttr: '='
+                        },
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                            givenAttrs = attrs;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir an-attr="parentAttr+1"></div>');
+                $compile(el)($rootScope);
+                $rootScope.parentAttr = 41;
+                $rootScope.$digest();
+                expect(givenScope.anAttr).toBe(42);
+            });
+        });
+
+        it('使用=*双向绑定数组', function() {
+            var givenScope, givenAttrs;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {
+                            anAttr: '=*'
+                        },
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                            givenAttrs = attrs;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                $rootScope.parentAttr = function() {
+                    return [1, 2, 3];
+                };
+                var el = $('<div my-dir an-attr="parentAttr()"></div>');
+                $compile(el)($rootScope);
+                $rootScope.$digest();
+                expect(givenScope.anAttr).toEqual([1, 2, 3]);
+            });
+        });
+
+        it('使用=?绑定(如果元素上不存在此属性,不会添加watcher)', function() {
+            var givenScope, givenAttrs;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {
+                            anAttr: '=?'
+                        },
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                            givenAttrs = attrs;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir></div>');
+                $compile(el)($rootScope);
+                expect($rootScope.$$watchers.length).toBe(0);
+            });
+        });
+
+        it('isolate scope 使用&绑定(允许属性使用表达式计算)', function() {
+            var givenScope, givenAttrs;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {
+                            anAttr: '&'
+                        },
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                            givenAttrs = attrs;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                $rootScope.parentArr = function() {
+                    return 42;
+                };
+                var el = $('<div my-dir an-attr="parentArr()+1"></div>');
+                $compile(el)($rootScope);
+                expect(givenScope.anAttr()).toBe(43);
+            });
+        });
+
+        it('isolate scope 使用&绑定(允许属性表达式传递参数)', function() {
+            var givenScope, givenAttrs;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {
+                            anAttr: '&'
+                        },
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                            givenAttrs = attrs;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+            	var gotArg;
+                $rootScope.parentArr = function(arg) {
+                    gotArg=arg;
+                };
+                var el = $('<div my-dir an-attr="parentArr(argFromChild)"></div>');
+                $compile(el)($rootScope);
+                givenScope.anAttr({argFromChild:42});
+                expect(gotArg).toBe(42);
+            });
+        });
+
+
+        it('isolate scope 使用&?绑定(元素上没有属性,isolateScope的值为undefined)', function() {
+            var givenScope, givenAttrs;
+            var injector = makeInjectorWithDirectives({
+                'myDir': function() {
+                    return {
+                        scope: {
+                            anAttr: '&?'
+                        },
+                        link: function(scope, element, attrs) {
+                            givenScope = scope;
+                            givenAttrs = attrs;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+            	var gotArg;
+                $rootScope.parentArr = function(arg) {
+                    gotArg=arg;
+                };
+                var el = $('<div my-dir></div>');
+                $compile(el)($rootScope);
+                expect(givenScope.anAttr).toBeUndefined();
+            });
+        });
+
+
 
     });
 });
