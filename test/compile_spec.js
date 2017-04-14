@@ -1421,13 +1421,13 @@ describe('指令(directive)--$compile', function() {
             });
 
             injector.invoke(function($compile, $rootScope) {
-            	var gotArg;
+                var gotArg;
                 $rootScope.parentArr = function(arg) {
-                    gotArg=arg;
+                    gotArg = arg;
                 };
                 var el = $('<div my-dir an-attr="parentArr(argFromChild)"></div>');
                 $compile(el)($rootScope);
-                givenScope.anAttr({argFromChild:42});
+                givenScope.anAttr({ argFromChild: 42 });
                 expect(gotArg).toBe(42);
             });
         });
@@ -1450,14 +1450,405 @@ describe('指令(directive)--$compile', function() {
             });
 
             injector.invoke(function($compile, $rootScope) {
-            	var gotArg;
+                var gotArg;
                 $rootScope.parentArr = function(arg) {
-                    gotArg=arg;
+                    gotArg = arg;
                 };
                 var el = $('<div my-dir></div>');
                 $compile(el)($rootScope);
                 expect(givenScope.anAttr).toBeUndefined();
             });
+        });
+
+
+
+    });
+
+    describe('指令控制器controller', function() {
+
+        it('控制器添加到指令(使用构造函数)', function() {
+            var controllerInvoked;
+
+            var injector = makeInjectorWithDirectives('myDir', function() {
+                return {
+                    controller: function() {
+                        controllerInvoked = true;
+                    }
+                };
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+
+                var el = $('<div my-dir></div>');
+                $compile(el)($rootScope);
+                expect(controllerInvoked).toBe(true);
+            });
+        });
+
+
+        it('控制器添加到指令(使用字符串)', function() {
+            var controllerInvoked;
+
+            function MyController() {
+                controllerInvoked = true;
+            }
+
+            var injector = createInjector(['ng', function($controllerProvider, $compileProvider) {
+                $controllerProvider.register('MyController', MyController);
+                $compileProvider.directive('myDir', function() {
+                    return {
+                        controller: 'MyController'
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+
+                var el = $('<div my-dir></div>');
+                $compile(el)($rootScope);
+                expect(controllerInvoked).toBe(true);
+            });
+        });
+
+        it('不同指令应用到相同元素,指令的控制器是独立的对象', function() {
+            var controllerInvoked;
+            var other;
+
+            function MyController() {
+                controllerInvoked = true;
+            }
+
+            function OtherController() {
+                other = true;
+            }
+
+            var injector = createInjector(['ng', function($controllerProvider, $compileProvider) {
+                $controllerProvider.register('MyController', MyController);
+                $controllerProvider.register('OtherController', OtherController);
+
+                $compileProvider.directive('myDir', function() {
+                    return {
+                        controller: 'MyController'
+                    };
+                });
+
+                $compileProvider.directive('myOir', function() {
+                    return {
+                        controller: 'OtherController'
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+
+                var el = $('<div my-dir my-oir></div>');
+                $compile(el)($rootScope);
+                expect(controllerInvoked).toBe(true);
+                expect(other).toBe(true);
+            });
+
+        });
+
+        it('不同指令可以使用相同的控制器构造器', function() {
+            var controllerInvoked = 0;
+
+            function MyController() {
+                controllerInvoked++;
+            }
+
+
+            var injector = createInjector(['ng', function($controllerProvider, $compileProvider) {
+                $controllerProvider.register('MyController', MyController);
+
+                $compileProvider.directive('myDir', function() {
+                    return {
+                        controller: 'MyController'
+                    };
+                });
+
+                $compileProvider.directive('myOir', function() {
+                    return {
+                        controller: 'MyController'
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+
+                var el = $('<div my-dir my-oir></div>');
+                $compile(el)($rootScope);
+                expect(controllerInvoked).toBe(2);
+            });
+
+        });
+
+        it('使用@给指令控制器赋值(值为指令属性的值)', function() {
+            var controllerInvoked;
+
+            function MyController() {
+                controllerInvoked = true;
+            }
+            var injector = createInjector(['ng', function($controllerProvider, $compileProvider) {
+                $controllerProvider.register('MyController', MyController);
+
+                $compileProvider.directive('myDir', function() {
+                    return {
+                        controller: '@'
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+
+                var el = $('<div my-dir="MyController"></div>');
+                $compile(el)($rootScope);
+                expect(controllerInvoked).toBe(true);
+            });
+
+        });
+
+        it('给指令控制器注入scope,element,attrs', function() {
+            var gotScope, gotElement, goAttrs;
+
+            function MyController($element, $scope, $attrs) {
+                gotScope = $scope;
+                gotElement = $element;
+                gotAttrs = $attrs;
+            }
+            var injector = createInjector(['ng', function($controllerProvider, $compileProvider) {
+                $controllerProvider.register('MyController', MyController);
+
+                $compileProvider.directive('myDir', function() {
+                    return {
+                        controller: '@'
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+
+                var el = $('<div my-dir="MyController" an-attr="abc"></div>');
+                $compile(el)($rootScope);
+                expect(gotElement[0]).toBe(el[0]);
+                expect(gotScope).toBe($rootScope);
+                expect(gotAttrs.anAttr).toEqual('abc');
+            });
+
+        });
+
+        it('将控制器附加到scope上', function() {
+
+            function MyController() {}
+
+            var injector = createInjector(['ng', function($controllerProvider, $compileProvider) {
+                $controllerProvider.register('MyController', MyController);
+
+                $compileProvider.directive('myDir', function() {
+                    return {
+                        controller: '@',
+                        controllerAs: 'myCtrl'
+                    };
+                });
+            }]);
+            injector.invoke(function($compile, $rootScope) {
+
+                var el = $('<div my-dir="MyController" an-attr="abc"></div>');
+                $compile(el)($rootScope);
+                expect($rootScope.myCtrl).toBeDefined();
+                expect($rootScope.myCtrl instanceof MyController).toBe(true);
+            });
+
+        });
+
+
+        it('给指令控制器注入isolateScope', function() {
+            var gotScope, gotElement, goAttrs;
+
+            function MyController($element, $scope, $attrs) {
+                gotScope = $scope;
+                gotElement = $element;
+                gotAttrs = $attrs;
+            }
+            var injector = createInjector(['ng', function($controllerProvider, $compileProvider) {
+                $controllerProvider.register('MyController', MyController);
+
+                $compileProvider.directive('myDir', function() {
+                    return {
+                        scope: {},
+                        controller: '@'
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+
+                var el = $('<div my-dir="MyController" an-attr="abc"></div>');
+                $compile(el)($rootScope);
+                expect(gotScope).not.toBe($rootScope);
+            });
+
+        });
+
+        it('当指令控制器实例化时,isolate的绑定已经完成', function() {
+            var goAttrs;
+
+            function MyController($scope) {
+                gotAttrs = $scope.myAttr;
+            }
+            var injector = createInjector(['ng', function($controllerProvider, $compileProvider) {
+                $controllerProvider.register('MyController', MyController);
+
+                $compileProvider.directive('myDir', function() {
+                    return {
+                        scope: {
+                            myAttr: '@myDir'
+                        },
+                        controller: 'MyController'
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+
+                var el = $('<div my-dir="abc" an-attr="abc"></div>');
+                $compile(el)($rootScope);
+                expect(gotAttrs).toBe("abc");
+            });
+
+        });
+
+        it('将isolateScope的属性绑定到指令控制器实例', function() {
+            var goAttrs;
+
+            function MyController($scope) {
+                gotAttrs = this.myAttr;
+            }
+            var injector = createInjector(['ng', function($controllerProvider, $compileProvider) {
+                $controllerProvider.register('MyController', MyController);
+
+                $compileProvider.directive('myDir', function() {
+                    return {
+                        scope: {
+                            myAttr: '@myDir'
+                        },
+                        controller: 'MyController',
+                        bindToController: true
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+
+                var el = $('<div my-dir="abc"></div>');
+                $compile(el)($rootScope);
+                expect(gotAttrs).toBe("abc");
+            });
+
+        });
+
+
+        it('返回控制器的不完整构造函数', function() {
+            var injector = createInjector(['ng']);
+            var $controller = injector.get('$controller');
+
+            function MyController() {
+                this.constructed = true;
+                this.myAttrWhenConstructed = this.myAttr;
+            }
+            var controller = $controller(MyController, null, true);
+            expect(controller.constructed).toBeUndefined();
+            expect(controller.instance).toBeDefined();
+            controller.instance.myAttr = 42;
+            var actualController = controller();
+
+            expect(actualController.constructed).toBeDefined();
+            expect(actualController.myAttrWhenConstructed).toBe(42);
+        });
+
+        it('返回控制器的不完整构造函数(使用数组形式的依赖注入)', function() {
+            var injector = createInjector(['ng', function($provide) {
+                $provide.constant('aDep', 42);
+            }]);
+            var $controller = injector.get('$controller');
+
+            function MyController(aDep) {
+                this.aDep = aDep;
+                this.constructed = true;
+            }
+            var controller = $controller(['aDep', MyController], null, true);
+            expect(controller.constructed).toBeUndefined();
+            var actualController = controller();
+            expect(actualController.constructed).toBeDefined();
+            expect(actualController.aDep).toBe(42);
+        });
+
+        it('将不完整的控制器实例绑定到scope', function() {
+            var scope = {};
+
+            function MyController($scope) {
+
+            }
+            var injector = createInjector(['ng']);
+            var $controller = injector.get('$controller');
+            var controller = $controller(MyController, { $scope: scope }, true, 'myCtrl');
+            expect(scope.myCtrl).toBe(controller.instance);
+
+        });
+
+        it('通过bindToController 给isolateScope绑定属性', function() {
+            var gotMyAttr;
+
+
+            function MyController() {
+                gotMyAttr = this.myAttr;
+            }
+            var injector = createInjector(['ng', function($controllerProvider, $compileProvider) {
+                $controllerProvider.register('MyController', MyController);
+                $compileProvider.directive('myDirective', function() {
+                    return {
+                        scope: {},
+                        controller: 'MyController',
+                        bindToController: {
+                            myAttr: '@myDirective'
+                        }
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-directive="abc"></div>');
+                $compile(el)($rootScope);
+                expect(gotMyAttr).toEqual('abc');
+            });
+
+        });
+
+        it('通过bindToController 给新建的继承的scope绑定属性', function() {
+            var gotMyAttr;
+
+
+            function MyController() {
+                gotMyAttr = this.myAttr;
+            }
+            var injector = createInjector(['ng', function($controllerProvider, $compileProvider) {
+                $controllerProvider.register('MyController', MyController);
+                $compileProvider.directive('myDirective', function() {
+                    return {
+                        scope:true,
+                        controller: 'MyController',
+                        bindToController: {
+                            myAttr: '@myDirective'
+                        }
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-directive="abc"></div>');
+                $compile(el)($rootScope);
+                expect(gotMyAttr).toEqual('abc');
+            });
+
         });
 
 
