@@ -1851,6 +1851,97 @@ describe('指令(directive)--$compile', function() {
 
         });
 
+        it('require 其他指令(兄弟指令,即作用于同一元素上的指令)的控制器', function() {
+
+            function MyController(){}
+            var gotController;
+            var injector=createInjector(['ng',function($compileProvider){
+                $compileProvider.directive('myDir',function(){
+
+                    return {
+                        scope:{},
+                        controller:MyController
+                    };
+                });
+
+                $compileProvider.directive('myOir',function(){
+
+                    return {
+                        require:"myDir",
+                        link:function(scope,element,attrs,myController){
+                            gotController=myController;
+                        }
+                    };
+                });
+
+            }]);
+
+            injector.invoke(function($compile,$rootScope){
+                var el=$("<div my-dir my-oir></div>");
+                $compile(el)($rootScope);
+                expect(gotController).toBeDefined();
+                expect(gotController instanceof MyController).toBe(true);
+            });
+            
+        });
+
+
+        it('如果指令没有require其他,使用自己的控制器', function() {
+
+            function MyController(){}
+            var gotController;
+            var injector=createInjector(['ng',function($compileProvider){
+                $compileProvider.directive('myOir',function(){
+
+                    return {
+                        scope:{},
+                        controller:MyController,
+                        link:function(scope,element,attrs,myController){
+                            gotController=myController;
+                        }
+                    };
+                });
+
+            }]);
+
+            injector.invoke(function($compile,$rootScope){
+                var el=$("<div my-oir></div>");
+                $compile(el)($rootScope);
+                expect(gotController).toBeDefined();
+                expect(gotController instanceof MyController).toBe(true);
+            });
+            
+        });
+
+
+
+        it('多元素指令的require', function() {
+
+            function MyController(){}
+            var gotController;
+            var injector=createInjector(['ng',function($compileProvider){
+                $compileProvider.directive('myDir',function(){
+
+                    return {
+                        multiElement:true,
+                        scope:{},
+                        controller:MyController,
+                        link:function(scope,element,attrs,myController){
+                            gotController = myController;
+                        }
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile,$rootScope){
+                var el=$("<div my-dir-start></div><div my-dir-end></div>");
+                $compile(el)($rootScope);
+                expect(gotController).toBeDefined();
+                expect(gotController instanceof MyController).toBe(true);
+            });
+            
+        });
+
 
 
     });
