@@ -12,534 +12,536 @@ describe('指令(directive)--$compile', function() {
         }]);
     }
 
-    it('注册指令', function() {
-        var my = window.angular.module('myModule', []);
-        my.directive('testing', function() {});
-        var injector = createInjector(['ng', 'myModule']);
-        expect(injector.has('testingDirective')).toBe(true);
-    });
-
-    it('允许使用相同名称注册指令', function() {
-        var my = window.angular.module('myModule', []);
-        my.directive('testing', _.constant({ d: 'one' }));
-        my.directive('testing', _.constant({ d: 'two' }));
-        var injector = createInjector(['ng', 'myModule']);
-
-        var result = injector.get('testingDirective');
-        expect(result.length).toBe(2);
-        expect(result[0].d).toEqual('one');
-    });
-
-    it('编译元素类型的指令(单个元素)', function() {
-        var injector = makeInjectorWithDirectives('myDirective', function() {
-            return {
-                compile: function(element) {
-                    element.data('hasCompiled', true);
-                }
-            };
+    describe('基础编译过程', function() {
+        it('注册指令', function() {
+            var my = window.angular.module('myModule', []);
+            my.directive('testing', function() {});
+            var injector = createInjector(['ng', 'myModule']);
+            expect(injector.has('testingDirective')).toBe(true);
         });
-        injector.invoke(function($compile) {
-            var el = $('<my-directive></my-directive');
-            $compile(el);
-            expect(el.data('hasCompiled')).toBe(true);
+
+        it('允许使用相同名称注册指令', function() {
+            var my = window.angular.module('myModule', []);
+            my.directive('testing', _.constant({ d: 'one' }));
+            my.directive('testing', _.constant({ d: 'two' }));
+            var injector = createInjector(['ng', 'myModule']);
+
+            var result = injector.get('testingDirective');
+            expect(result.length).toBe(2);
+            expect(result[0].d).toEqual('one');
         });
-    });
+
+        it('编译元素类型的指令(单个元素)', function() {
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    compile: function(element) {
+                        element.data('hasCompiled', true);
+                    }
+                };
+            });
+            injector.invoke(function($compile) {
+                var el = $('<my-directive></my-directive');
+                $compile(el);
+                expect(el.data('hasCompiled')).toBe(true);
+            });
+        });
 
 
-    it('编译元素类型的指令(多个元素)', function() {
-        var idx = 1;
-        var injector = makeInjectorWithDirectives('myDirective', function() {
-            return {
-                compile: function(element) {
-                    element.data('hasCompiled', idx++);
-                }
-            };
+        it('编译元素类型的指令(多个元素)', function() {
+            var idx = 1;
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    compile: function(element) {
+                        element.data('hasCompiled', idx++);
+                    }
+                };
+            });
+            injector.invoke(function($compile) {
+                var el = $('<my-directive></my-directive><my-directive></my-directive>');
+                $compile(el);
+                expect(el.eq(0).data('hasCompiled')).toBe(1);
+                expect(el.eq(1).data('hasCompiled')).toBe(2);
+            });
         });
-        injector.invoke(function($compile) {
-            var el = $('<my-directive></my-directive><my-directive></my-directive>');
-            $compile(el);
-            expect(el.eq(0).data('hasCompiled')).toBe(1);
-            expect(el.eq(1).data('hasCompiled')).toBe(2);
-        });
-    });
 
-    it('编译dom节点的子元素指令', function() {
-        var idx = 1;
-        var injector = makeInjectorWithDirectives('myDirective', function() {
-            return {
-                compile: function(element) {
-                    element.data('hasCompiled', idx++);
-                }
-            };
+        it('编译dom节点的子元素指令', function() {
+            var idx = 1;
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    compile: function(element) {
+                        element.data('hasCompiled', idx++);
+                    }
+                };
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div><my-directive></my-directive></div>');
+                $compile(el);
+                expect(el.data('hasCompiled')).toBeUndefined();
+                expect(el.find(">my-directive").data('hasCompiled')).toBe(1);
+            });
         });
-        injector.invoke(function($compile) {
-            var el = $('<div><my-directive></my-directive></div>');
-            $compile(el);
-            expect(el.data('hasCompiled')).toBeUndefined();
-            expect(el.find(">my-directive").data('hasCompiled')).toBe(1);
-        });
-    });
 
-    it('编译元素类型的指令,并且子元素也是元素类型指令', function() {
-        var idx = 1;
-        var injector = makeInjectorWithDirectives('myDir', function() {
-            return {
-                compile: function(element) {
-                    element.data('hasCompiled', idx++);
-                }
-            };
+        it('编译元素类型的指令,并且子元素也是元素类型指令', function() {
+            var idx = 1;
+            var injector = makeInjectorWithDirectives('myDir', function() {
+                return {
+                    compile: function(element) {
+                        element.data('hasCompiled', idx++);
+                    }
+                };
+            });
+            injector.invoke(function($compile) {
+                var el = $('<my-dir><my-dir><my-dir/></my-dir></my-dir>');
+                $compile(el);
+                expect(el.data('hasCompiled')).toBe(1);
+                expect(el.find(">my-dir").data('hasCompiled')).toBe(2);
+                expect(el.find(">my-dir>my-dir").data('hasCompiled')).toBe(3);
+            });
         });
-        injector.invoke(function($compile) {
-            var el = $('<my-dir><my-dir><my-dir/></my-dir></my-dir>');
-            $compile(el);
-            expect(el.data('hasCompiled')).toBe(1);
-            expect(el.find(">my-dir").data('hasCompiled')).toBe(2);
-            expect(el.find(">my-dir>my-dir").data('hasCompiled')).toBe(3);
+
+        _.forEach(['x', 'data'], function(prefix) {
+
+            _.forEach([":", "-", "_"], function(delim) {
+                it('编译元素类型的指令(设置前缀、设置分隔符)', function() {
+                    var injector = makeInjectorWithDirectives('myDir', function() {
+                        return {
+                            compile: function(element) {
+                                element.data('hasCompiled', true);
+                            }
+                        };
+                    });
+
+                    injector.invoke(function($compile) {
+                        var el = $('<' + prefix + delim + 'my-dir></' + prefix + delim + 'my-dir>');
+                        $compile(el);
+                        expect(el.data('hasCompiled')).toBe(true);
+                    });
+
+                });
+            });
         });
-    });
 
-    _.forEach(['x', 'data'], function(prefix) {
 
-        _.forEach([":", "-", "_"], function(delim) {
-            it('编译元素类型的指令(设置前缀、设置分隔符)', function() {
-                var injector = makeInjectorWithDirectives('myDir', function() {
+        it('编译属性类型的指令', function() {
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    compile: function(element) {
+                        element.data('hasCompiled', true);
+                    }
+                };
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-directive></div>');
+                $compile(el);
+                expect(el.data('hasCompiled')).toBe(true);
+            });
+        });
+
+        it('编译带前缀的属性指令', function() {
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    compile: function(element) {
+                        element.data('hasCompiled', true);
+                    }
+                };
+            });
+
+            injector.invoke(function($compile) {
+                var el = $('<div x:my-directive></div>');
+                $compile(el);
+                expect(el.data('hasCompiled')).toBe(true);
+            });
+
+        });
+
+        it('编译同一个元素上的多个属性指令', function() {
+            var injector = makeInjectorWithDirectives({
+                myDirective: function() {
                     return {
                         compile: function(element) {
                             element.data('hasCompiled', true);
                         }
                     };
-                });
-
-                injector.invoke(function($compile) {
-                    var el = $('<' + prefix + delim + 'my-dir></' + prefix + delim + 'my-dir>');
-                    $compile(el);
-                    expect(el.data('hasCompiled')).toBe(true);
-                });
-
-            });
-        });
-    });
-
-
-    it('编译属性类型的指令', function() {
-        var injector = makeInjectorWithDirectives('myDirective', function() {
-            return {
-                compile: function(element) {
-                    element.data('hasCompiled', true);
-                }
-            };
-        });
-        injector.invoke(function($compile) {
-            var el = $('<div my-directive></div>');
-            $compile(el);
-            expect(el.data('hasCompiled')).toBe(true);
-        });
-    });
-
-    it('编译带前缀的属性指令', function() {
-        var injector = makeInjectorWithDirectives('myDirective', function() {
-            return {
-                compile: function(element) {
-                    element.data('hasCompiled', true);
-                }
-            };
-        });
-
-        injector.invoke(function($compile) {
-            var el = $('<div x:my-directive></div>');
-            $compile(el);
-            expect(el.data('hasCompiled')).toBe(true);
-        });
-
-    });
-
-    it('编译同一个元素上的多个属性指令', function() {
-        var injector = makeInjectorWithDirectives({
-            myDirective: function() {
-                return {
-                    compile: function(element) {
-                        element.data('hasCompiled', true);
-                    }
-                };
-            },
-            mySecondDirective: function() {
-                return {
-                    compile: function(element) {
-                        element.data('hasCompiled2', true);
-                    }
-                };
-            }
-        });
-
-        injector.invoke(function($compile) {
-            var el = $('<div my-directive my-second-directive></div>');
-            $compile(el);
-            expect(el.data('hasCompiled')).toBe(true);
-            expect(el.data('hasCompiled2')).toBe(true);
-        });
-    });
-
-    it('编译元素指令,元素指令上有属性指令', function() {
-        var injector = makeInjectorWithDirectives({
-            myDirective: function() {
-                return {
-                    compile: function(element) {
-                        element.data('hasCompiled', true);
-                    }
-                };
-            },
-            mySecondDirective: function() {
-                return {
-                    compile: function(element) {
-                        element.data('hasCompiled2', true);
-                    }
-                };
-            }
-        });
-
-        injector.invoke(function($compile) {
-            var el = $('<my-directive my-second-directive></my-directive>');
-            $compile(el);
-            expect(el.data('hasCompiled')).toBe(true);
-            expect(el.data('hasCompiled2')).toBe(true);
-        });
-
-    });
-
-    it('编译带有ng-attr前缀的属性指令', function() {
-        var injector = makeInjectorWithDirectives({
-            myDirective: function() {
-                return {
-                    compile: function(element) {
-                        element.data('hasCompiled', true);
-                    }
-                };
-            }
-        });
-
-        injector.invoke(function($compile) {
-            var el = $('<div ng-attr-my-directive></div>');
-            $compile(el);
-            expect(el.data('hasCompiled')).toBe(true);
-        });
-    });
-
-    it('编译带有data:ng-attr前缀的属性指令', function() {
-        var injector = makeInjectorWithDirectives({
-            myDirective: function() {
-                return {
-                    compile: function(element) {
-                        element.data('hasCompiled', true);
-                    }
-                };
-            }
-        });
-
-        injector.invoke(function($compile) {
-            var el = $('<div data:ng-attr-my-directive></div>');
-            $compile(el);
-            expect(el.data('hasCompiled')).toBe(true);
-        });
-    });
-
-    it('编译class类型的指令', function() {
-        var injector = makeInjectorWithDirectives({
-            myDirective: function() {
-                return {
-                    restrict: 'C',
-                    compile: function(element) {
-                        element.data('hasCompiled', true);
-                    }
-                };
-            }
-        });
-
-        injector.invoke(function($compile) {
-            var el = $('<div class="my-directive"></div>');
-            $compile(el);
-            expect(el.data('hasCompiled')).toBe(true);
-        });
-    });
-
-    it('编译同一个元素上的多个class指令', function() {
-        var injector = makeInjectorWithDirectives({
-            myDirective: function() {
-                return {
-                    restrict: 'C',
-                    compile: function(element) {
-                        element.data('hasCompiled', true);
-                    }
-                };
-            },
-            mySecondDirective: function() {
-                return {
-                    restrict: 'C',
-                    compile: function(element) {
-                        element.data('hasCompiled2', true);
-                    }
-                };
-            }
-        });
-
-        injector.invoke(function($compile) {
-            var el = $('<div class="my-directive my-second-directive"></div>');
-            $compile(el);
-            expect(el.data('hasCompiled')).toBe(true);
-            expect(el.data('hasCompiled2')).toBe(true);
-        });
-    });
-
-
-    it('编译注释类型的指令', function() {
-        var hasCompiled;
-        var injector = makeInjectorWithDirectives({
-            myDirective: function() {
-                return {
-                    restrict: 'M',
-                    compile: function(element) {
-                        hasCompiled = true;
-                    }
-                };
-            }
-        });
-
-        injector.invoke(function($compile) {
-            var el = $('<!-- directive:my-directive -->');
-            $compile(el);
-            expect(hasCompiled).toBe(true);
-        });
-    });
-    var restrictType = {
-        E: { element: true, attribute: false, class: false, comment: false },
-        A: { element: false, attribute: true, class: false, comment: false },
-        C: { element: false, attribute: false, class: true, comment: false },
-        M: { element: false, attribute: false, class: false, comment: true },
-        EA: { element: true, attribute: true, class: false, comment: false },
-        AC: { element: false, attribute: true, class: true, comment: false },
-        EAM: { element: true, attribute: true, class: false, comment: true },
-        EACM: { element: true, attribute: true, class: true, comment: true }
-    };
-    _.forEach(restrictType, function(expected, restrict) {
-
-        describe('编译时限制指令类型为:' + restrict, function() {
-
-            _.forEach({
-                element: "<my-directive></my-directive>",
-                attribute: "<div my-directive></div>",
-                class: "<div class='my-directive'></div>",
-                comment: "<!--directive:my-directive -->"
-            }, function(dom, type) {
-                it("指令类型" + (expected[type] ? "匹配" : "不匹配" + type), function() {
-                    var hasCompiled = false;
-                    var injector = makeInjectorWithDirectives({
-                        myDirective: function() {
-                            return {
-                                restrict: restrict,
-                                compile: function(element) {
-                                    hasCompiled = true;
-                                }
-                            };
+                },
+                mySecondDirective: function() {
+                    return {
+                        compile: function(element) {
+                            element.data('hasCompiled2', true);
                         }
-                    });
-                    injector.invoke(function($compile) {
-                        var el = $(dom);
-                        $compile(el);
-                        expect(hasCompiled).toBe(expected[type]);
-                    });
-                });
+                    };
+                }
+            });
 
+            injector.invoke(function($compile) {
+                var el = $('<div my-directive my-second-directive></div>');
+                $compile(el);
+                expect(el.data('hasCompiled')).toBe(true);
+                expect(el.data('hasCompiled2')).toBe(true);
+            });
+        });
+
+        it('编译元素指令,元素指令上有属性指令', function() {
+            var injector = makeInjectorWithDirectives({
+                myDirective: function() {
+                    return {
+                        compile: function(element) {
+                            element.data('hasCompiled', true);
+                        }
+                    };
+                },
+                mySecondDirective: function() {
+                    return {
+                        compile: function(element) {
+                            element.data('hasCompiled2', true);
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile) {
+                var el = $('<my-directive my-second-directive></my-directive>');
+                $compile(el);
+                expect(el.data('hasCompiled')).toBe(true);
+                expect(el.data('hasCompiled2')).toBe(true);
             });
 
         });
-    });
 
-    it('应用指令优先级排序', function() {
-        var compilations = [];
-        var injector = makeInjectorWithDirectives({
-            myDirective: function() {
-                return {
-                    priority: 1,
-                    compile: function(element) {
-                        compilations.push('lower');
-                    }
-                };
-            },
-            mySecondDirective: function() {
-                return {
-                    priority: 2,
-                    compile: function(element) {
-                        compilations.push('higher');
-                    }
-                };
-            }
-        });
-        injector.invoke(function($compile) {
-            var el = $('<div my-directive my-second-directive></div>');
-            $compile(el);
-            expect(compilations).toEqual(['higher', 'lower']);
+        it('编译带有ng-attr前缀的属性指令', function() {
+            var injector = makeInjectorWithDirectives({
+                myDirective: function() {
+                    return {
+                        compile: function(element) {
+                            element.data('hasCompiled', true);
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile) {
+                var el = $('<div ng-attr-my-directive></div>');
+                $compile(el);
+                expect(el.data('hasCompiled')).toBe(true);
+            });
         });
 
-    });
+        it('编译带有data:ng-attr前缀的属性指令', function() {
+            var injector = makeInjectorWithDirectives({
+                myDirective: function() {
+                    return {
+                        compile: function(element) {
+                            element.data('hasCompiled', true);
+                        }
+                    };
+                }
+            });
 
-    it('指令优先级排序时如果优先级相同,按照指令名称排序', function() {
-        var compilations = [];
-        var injector = makeInjectorWithDirectives({
-            firstDirective: function() {
+            injector.invoke(function($compile) {
+                var el = $('<div data:ng-attr-my-directive></div>');
+                $compile(el);
+                expect(el.data('hasCompiled')).toBe(true);
+            });
+        });
+
+        it('编译class类型的指令', function() {
+            var injector = makeInjectorWithDirectives({
+                myDirective: function() {
+                    return {
+                        restrict: 'C',
+                        compile: function(element) {
+                            element.data('hasCompiled', true);
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile) {
+                var el = $('<div class="my-directive"></div>');
+                $compile(el);
+                expect(el.data('hasCompiled')).toBe(true);
+            });
+        });
+
+        it('编译同一个元素上的多个class指令', function() {
+            var injector = makeInjectorWithDirectives({
+                myDirective: function() {
+                    return {
+                        restrict: 'C',
+                        compile: function(element) {
+                            element.data('hasCompiled', true);
+                        }
+                    };
+                },
+                mySecondDirective: function() {
+                    return {
+                        restrict: 'C',
+                        compile: function(element) {
+                            element.data('hasCompiled2', true);
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile) {
+                var el = $('<div class="my-directive my-second-directive"></div>');
+                $compile(el);
+                expect(el.data('hasCompiled')).toBe(true);
+                expect(el.data('hasCompiled2')).toBe(true);
+            });
+        });
+
+
+        it('编译注释类型的指令', function() {
+            var hasCompiled;
+            var injector = makeInjectorWithDirectives({
+                myDirective: function() {
+                    return {
+                        restrict: 'M',
+                        compile: function(element) {
+                            hasCompiled = true;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile) {
+                var el = $('<!-- directive:my-directive -->');
+                $compile(el);
+                expect(hasCompiled).toBe(true);
+            });
+        });
+        var restrictType = {
+            E: { element: true, attribute: false, class: false, comment: false },
+            A: { element: false, attribute: true, class: false, comment: false },
+            C: { element: false, attribute: false, class: true, comment: false },
+            M: { element: false, attribute: false, class: false, comment: true },
+            EA: { element: true, attribute: true, class: false, comment: false },
+            AC: { element: false, attribute: true, class: true, comment: false },
+            EAM: { element: true, attribute: true, class: false, comment: true },
+            EACM: { element: true, attribute: true, class: true, comment: true }
+        };
+        _.forEach(restrictType, function(expected, restrict) {
+
+            describe('编译时限制指令类型为:' + restrict, function() {
+
+                _.forEach({
+                    element: "<my-directive></my-directive>",
+                    attribute: "<div my-directive></div>",
+                    class: "<div class='my-directive'></div>",
+                    comment: "<!--directive:my-directive -->"
+                }, function(dom, type) {
+                    it("指令类型" + (expected[type] ? "匹配" : "不匹配" + type), function() {
+                        var hasCompiled = false;
+                        var injector = makeInjectorWithDirectives({
+                            myDirective: function() {
+                                return {
+                                    restrict: restrict,
+                                    compile: function(element) {
+                                        hasCompiled = true;
+                                    }
+                                };
+                            }
+                        });
+                        injector.invoke(function($compile) {
+                            var el = $(dom);
+                            $compile(el);
+                            expect(hasCompiled).toBe(expected[type]);
+                        });
+                    });
+
+                });
+
+            });
+        });
+
+        it('应用指令优先级排序', function() {
+            var compilations = [];
+            var injector = makeInjectorWithDirectives({
+                myDirective: function() {
+                    return {
+                        priority: 1,
+                        compile: function(element) {
+                            compilations.push('lower');
+                        }
+                    };
+                },
+                mySecondDirective: function() {
+                    return {
+                        priority: 2,
+                        compile: function(element) {
+                            compilations.push('higher');
+                        }
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-directive my-second-directive></div>');
+                $compile(el);
+                expect(compilations).toEqual(['higher', 'lower']);
+            });
+
+        });
+
+        it('指令优先级排序时如果优先级相同,按照指令名称排序', function() {
+            var compilations = [];
+            var injector = makeInjectorWithDirectives({
+                firstDirective: function() {
+                    return {
+                        priority: 1,
+                        compile: function(element) {
+                            compilations.push('first');
+                        }
+                    };
+                },
+                secondDirective: function() {
+                    return {
+                        priority: 1,
+                        compile: function(element) {
+                            compilations.push('second');
+                        }
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div second-directive first-directive ></div>');
+                $compile(el);
+                expect(compilations).toEqual(['first', 'second']);
+            });
+        });
+
+
+        it('指令优先级排序时如果优先级跟名称都相同,按照注册指令顺序排序', function() {
+            var compilations = [];
+            var my = window.angular.module('myModule', []);
+            my.directive('aDirective', function() {
                 return {
                     priority: 1,
                     compile: function(element) {
                         compilations.push('first');
                     }
                 };
-            },
-            secondDirective: function() {
+            });
+            my.directive('aDirective', function() {
                 return {
                     priority: 1,
                     compile: function(element) {
                         compilations.push('second');
                     }
                 };
-            }
-        });
-        injector.invoke(function($compile) {
-            var el = $('<div second-directive first-directive ></div>');
-            $compile(el);
-            expect(compilations).toEqual(['first', 'second']);
-        });
-    });
-
-
-    it('指令优先级排序时如果优先级跟名称都相同,按照注册指令顺序排序', function() {
-        var compilations = [];
-        var my = window.angular.module('myModule', []);
-        my.directive('aDirective', function() {
-            return {
-                priority: 1,
-                compile: function(element) {
-                    compilations.push('first');
-                }
-            };
-        });
-        my.directive('aDirective', function() {
-            return {
-                priority: 1,
-                compile: function(element) {
-                    compilations.push('second');
-                }
-            };
-        });
-        var injector = createInjector(['ng', 'myModule']);
-        injector.invoke(function($compile) {
-            var el = $('<div a-directive ></div>');
-            $compile(el);
-            expect(compilations).toEqual(['first', 'second']);
-        });
-    });
-
-    it('编译时碰到终端指令(terminal值为true)的话停止优先级低于当前指令的编译', function() {
-        var compilations = [];
-        var my = window.angular.module('myModule', []);
-        my.directive('firstDirective', function() {
-            return {
-                priority: 1,
-                terminal: true,
-                compile: function(element) {
-                    compilations.push('first');
-                }
-            };
-        });
-        my.directive('secondDirective', function() {
-            return {
-                priority: 0,
-                compile: function(element) {
-                    compilations.push('second');
-                }
-            };
-        });
-        var injector = createInjector(['ng', 'myModule']);
-        injector.invoke(function($compile) {
-            var el = $('<div first-directive second-directive></div>');
-            $compile(el);
-            expect(compilations).toEqual(['first']);
+            });
+            var injector = createInjector(['ng', 'myModule']);
+            injector.invoke(function($compile) {
+                var el = $('<div a-directive ></div>');
+                $compile(el);
+                expect(compilations).toEqual(['first', 'second']);
+            });
         });
 
-    });
+        it('编译时碰到终端指令(terminal值为true)的话停止优先级低于当前指令的编译', function() {
+            var compilations = [];
+            var my = window.angular.module('myModule', []);
+            my.directive('firstDirective', function() {
+                return {
+                    priority: 1,
+                    terminal: true,
+                    compile: function(element) {
+                        compilations.push('first');
+                    }
+                };
+            });
+            my.directive('secondDirective', function() {
+                return {
+                    priority: 0,
+                    compile: function(element) {
+                        compilations.push('second');
+                    }
+                };
+            });
+            var injector = createInjector(['ng', 'myModule']);
+            injector.invoke(function($compile) {
+                var el = $('<div first-directive second-directive></div>');
+                $compile(el);
+                expect(compilations).toEqual(['first']);
+            });
 
-    it('编译时碰到终端指令(terminal值为true)的话继续优先级等于当前指令的编译', function() {
-        var compilations = [];
-        var my = window.angular.module('myModule', []);
-        my.directive('firstDirective', function() {
-            return {
-                priority: 1,
-                terminal: true,
-                compile: function(element) {
-                    compilations.push('first');
-                }
-            };
-        });
-        my.directive('secondDirective', function() {
-            return {
-                priority: 1,
-                compile: function(element) {
-                    compilations.push('second');
-                }
-            };
-        });
-        var injector = createInjector(['ng', 'myModule']);
-        injector.invoke(function($compile) {
-            var el = $('<div first-directive second-directive></div>');
-            $compile(el);
-            expect(compilations).toEqual(['first', 'second']);
-        });
-
-    });
-
-
-    it('编译时碰到终端指令(terminal值为true)的话停止子元素的指令的编译', function() {
-        var compilations = [];
-        var my = window.angular.module('myModule', []);
-        my.directive('firstDirective', function() {
-            return {
-                priority: 1,
-                terminal: true,
-                compile: function(element) {
-                    compilations.push('first');
-                }
-            };
-        });
-        my.directive('secondDirective', function() {
-            return {
-                priority: 1,
-                compile: function(element) {
-                    compilations.push('second');
-                }
-            };
-        });
-        var injector = createInjector(['ng', 'myModule']);
-        injector.invoke(function($compile) {
-            var el = $('<div first-directive><div  second-directive></div></div>');
-            $compile(el);
-            expect(compilations).toEqual(['first']);
         });
 
-    });
+        it('编译时碰到终端指令(terminal值为true)的话继续优先级等于当前指令的编译', function() {
+            var compilations = [];
+            var my = window.angular.module('myModule', []);
+            my.directive('firstDirective', function() {
+                return {
+                    priority: 1,
+                    terminal: true,
+                    compile: function(element) {
+                        compilations.push('first');
+                    }
+                };
+            });
+            my.directive('secondDirective', function() {
+                return {
+                    priority: 1,
+                    compile: function(element) {
+                        compilations.push('second');
+                    }
+                };
+            });
+            var injector = createInjector(['ng', 'myModule']);
+            injector.invoke(function($compile) {
+                var el = $('<div first-directive second-directive></div>');
+                $compile(el);
+                expect(compilations).toEqual(['first', 'second']);
+            });
 
-    it('允许指令覆盖多个同辈dom元素', function() {
-        var compileEl = [];
-        var my = window.angular.module('myModule', []);
-        my.directive('myDir', function() {
-            return {
-                multiElement: true,
-                compile: function(element) {
-                    compileEl = element;
-                }
-            };
         });
-        var injector = createInjector(['ng', 'myModule']);
-        injector.invoke(function($compile) {
-            var el = $('<div my-dir-start></div><span></span><div my-dir-end></div>');
-            $compile(el);
-            expect(compileEl.length).toBe(3);
+
+
+        it('编译时碰到终端指令(terminal值为true)的话停止子元素的指令的编译', function() {
+            var compilations = [];
+            var my = window.angular.module('myModule', []);
+            my.directive('firstDirective', function() {
+                return {
+                    priority: 1,
+                    terminal: true,
+                    compile: function(element) {
+                        compilations.push('first');
+                    }
+                };
+            });
+            my.directive('secondDirective', function() {
+                return {
+                    priority: 1,
+                    compile: function(element) {
+                        compilations.push('second');
+                    }
+                };
+            });
+            var injector = createInjector(['ng', 'myModule']);
+            injector.invoke(function($compile) {
+                var el = $('<div first-directive><div  second-directive></div></div>');
+                $compile(el);
+                expect(compilations).toEqual(['first']);
+            });
+
+        });
+
+        it('允许指令覆盖多个同辈dom元素', function() {
+            var compileEl = [];
+            var my = window.angular.module('myModule', []);
+            my.directive('myDir', function() {
+                return {
+                    multiElement: true,
+                    compile: function(element) {
+                        compileEl = element;
+                    }
+                };
+            });
+            var injector = createInjector(['ng', 'myModule']);
+            injector.invoke(function($compile) {
+                var el = $('<div my-dir-start></div><span></span><div my-dir-end></div>');
+                $compile(el);
+                expect(compileEl.length).toBe(3);
+            });
         });
     });
 
@@ -734,21 +736,22 @@ describe('指令(directive)--$compile', function() {
         });
     });
 
-    it('在compile函数中返回公共link函数', function() {
-        var injector = makeInjectorWithDirectives('myDirective', function() {
-            return {
-                compile: _.noop
-            };
-        });
-        injector.invoke(function($compile) {
-            var el = $('<div my-directive></div>');
-            var linkFn = $compile(el);
-            expect(linkFn).toBeDefined();
-            expect(_.isFunction(linkFn)).toBe(true);
-        });
-    });
+
 
     describe('指令链接linking', function() {
+        it('在compile函数中返回公共link函数', function() {
+            var injector = makeInjectorWithDirectives('myDirective', function() {
+                return {
+                    compile: _.noop
+                };
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-directive></div>');
+                var linkFn = $compile(el);
+                expect(linkFn).toBeDefined();
+                expect(_.isFunction(linkFn)).toBe(true);
+            });
+        });
 
         it('传递任意一个scope对象作为link函数参数', function() {
             var injector = makeInjectorWithDirectives('myDirective', function() {
@@ -1834,7 +1837,7 @@ describe('指令(directive)--$compile', function() {
                 $controllerProvider.register('MyController', MyController);
                 $compileProvider.directive('myDirective', function() {
                     return {
-                        scope:true,
+                        scope: true,
                         controller: 'MyController',
                         bindToController: {
                             myAttr: '@myDirective'
@@ -1853,94 +1856,344 @@ describe('指令(directive)--$compile', function() {
 
         it('require 其他指令(兄弟指令,即作用于同一元素上的指令)的控制器', function() {
 
-            function MyController(){}
+            function MyController() {}
             var gotController;
-            var injector=createInjector(['ng',function($compileProvider){
-                $compileProvider.directive('myDir',function(){
+            var injector = createInjector(['ng', function($compileProvider) {
+                $compileProvider.directive('myDir', function() {
 
                     return {
-                        scope:{},
-                        controller:MyController
+                        scope: {},
+                        controller: MyController
                     };
                 });
 
-                $compileProvider.directive('myOir',function(){
+                $compileProvider.directive('myOir', function() {
 
                     return {
-                        require:"myDir",
-                        link:function(scope,element,attrs,myController){
-                            gotController=myController;
+                        require: "myDir",
+                        link: function(scope, element, attrs, myController) {
+                            gotController = myController;
                         }
                     };
                 });
 
             }]);
 
-            injector.invoke(function($compile,$rootScope){
-                var el=$("<div my-dir my-oir></div>");
+            injector.invoke(function($compile, $rootScope) {
+                var el = $("<div my-dir my-oir></div>");
                 $compile(el)($rootScope);
                 expect(gotController).toBeDefined();
                 expect(gotController instanceof MyController).toBe(true);
             });
-            
+
         });
 
 
         it('如果指令没有require其他,使用自己的控制器', function() {
 
-            function MyController(){}
+            function MyController() {}
             var gotController;
-            var injector=createInjector(['ng',function($compileProvider){
-                $compileProvider.directive('myOir',function(){
+            var injector = createInjector(['ng', function($compileProvider) {
+                $compileProvider.directive('myOir', function() {
 
                     return {
-                        scope:{},
-                        controller:MyController,
-                        link:function(scope,element,attrs,myController){
-                            gotController=myController;
+                        scope: {},
+                        controller: MyController,
+                        link: function(scope, element, attrs, myController) {
+                            gotController = myController;
                         }
                     };
                 });
 
             }]);
 
-            injector.invoke(function($compile,$rootScope){
-                var el=$("<div my-oir></div>");
+            injector.invoke(function($compile, $rootScope) {
+                var el = $("<div my-oir></div>");
                 $compile(el)($rootScope);
                 expect(gotController).toBeDefined();
                 expect(gotController instanceof MyController).toBe(true);
             });
-            
+
         });
 
 
 
         it('多元素指令的require', function() {
 
-            function MyController(){}
+            function MyController() {}
             var gotController;
-            var injector=createInjector(['ng',function($compileProvider){
-                $compileProvider.directive('myDir',function(){
+            var injector = createInjector(['ng', function($compileProvider) {
+                $compileProvider.directive('myDir', function() {
 
                     return {
-                        multiElement:true,
-                        scope:{},
-                        controller:MyController,
-                        link:function(scope,element,attrs,myController){
+                        multiElement: true,
+                        scope: {},
+                        controller: MyController,
+                        link: function(scope, element, attrs, myController) {
                             gotController = myController;
                         }
                     };
                 });
             }]);
 
-            injector.invoke(function($compile,$rootScope){
-                var el=$("<div my-dir-start></div><div my-dir-end></div>");
+            injector.invoke(function($compile, $rootScope) {
+                var el = $("<div my-dir-start></div><div my-dir-end></div>");
                 $compile(el)($rootScope);
                 expect(gotController).toBeDefined();
                 expect(gotController instanceof MyController).toBe(true);
             });
-            
+
         });
+
+        it('require 父级元素的指令控制器', function() {
+
+            function MyController() {}
+            var gotController;
+            var injector = createInjector(['ng', function($compileProvider) {
+                $compileProvider.directive('myDir', function() {
+
+                    return {
+                        scope: {},
+                        controller: MyController
+                    };
+                });
+
+                $compileProvider.directive('myOir', function() {
+
+                    return {
+                        require: '^myDir',
+                        link: function(scope, element, attrs, myController) {
+                            gotController = myController;
+                        }
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $("<div my-dir  ><div my-oir></div></div>");
+                $compile(el)($rootScope);
+                expect(gotController).toBeDefined();
+                expect(gotController instanceof MyController).toBe(true);
+            });
+        });
+
+        it('当require有^前缀时,从兄弟指令开始寻找require的指令控制器', function() {
+
+            function MyController() {}
+            var gotController;
+            var injector = createInjector(['ng', function($compileProvider) {
+                $compileProvider.directive('myDir', function() {
+
+                    return {
+                        scope: {},
+                        controller: MyController
+                    };
+                });
+
+                $compileProvider.directive('myOir', function() {
+
+                    return {
+                        require: '^myDir',
+                        link: function(scope, element, attrs, myController) {
+                            gotController = myController;
+                        }
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $("<div my-dir my-oir ><div></div></div>");
+                $compile(el)($rootScope);
+                expect(gotController).toBeDefined();
+                expect(gotController instanceof MyController).toBe(true);
+            });
+        });
+
+        it('当require有^^前缀时,只从父级指令开始寻找require的指令控制器', function() {
+
+            function MyController() {}
+            var gotController;
+            var injector = createInjector(['ng', function($compileProvider) {
+                $compileProvider.directive('myDir', function() {
+
+                    return {
+                        scope: {},
+                        controller: MyController
+                    };
+                });
+
+                $compileProvider.directive('myOir', function() {
+
+                    return {
+                        require: '^^myDir',
+                        link: function(scope, element, attrs, myController) {
+                            gotController = myController;
+                        }
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $("<div my-dir><div my-oir > </div></div>");
+                $compile(el)($rootScope);
+                expect(gotController).toBeDefined();
+                expect(gotController instanceof MyController).toBe(true);
+            });
+        });
+
+        it('当require为可选模式时(加?),未找到require的控制器传入null', function() {
+
+            function MyController() {}
+            var gotController;
+            var injector = createInjector(['ng', function($compileProvider) {
+                $compileProvider.directive('myDir', function() {
+
+                    return {
+                        scope: {},
+                        require: "?noSuchDirective",
+                        link: function(scope, element, attrs, ctrl) {
+                            gotController = ctrl;
+                        }
+                    };
+                });
+            }]);
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $("<div my-dir></div>");
+                $compile(el)($rootScope);
+                expect(gotController).toBe(null);
+            });
+        });
+
+
+
+    });
+
+    describe('指令模板', function() {
+
+        it('在指令所属的元素内插入模板元素', function() {
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        template: "<div class='from'></div>"
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-dir></div>');
+                $compile(el);
+                expect(el.find('>.from').length).toBe(1);
+            });
+
+        });
+
+        it('在指令所属的元素内插入模板元素,模板元素会替代现有的子元素', function() {
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        template: "<div class='from'></div>"
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-dir><div class="exist"></div></div>');
+                $compile(el);
+                expect(el.find('>.exist').length).toBe(0);
+            });
+
+        });
+
+        it('在指令所属的元素内插入模板元素(先编译模板)', function() {
+            var spy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        template: "<div my-oir></div>"
+                    };
+                },
+                myOir: function() {
+                    return {
+                        compile: spy
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-dir></div>');
+                $compile(el);
+                expect(spy).toHaveBeenCalled();
+            });
+
+        });
+
+        it('不允许同一元素上的2个指令都有template', function() {
+            var spy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        template: "<div></div>"
+                    };
+                },
+                myOir: function() {
+                    return {
+                        template: "<div></div>"
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-dir my-oir></div>');
+                expect(function() {
+                    $compile(el);
+                }).toThrow();
+            });
+
+        });
+
+        it('支持模板函数', function() {
+            var templateSpy = jasmine.createSpy().and.returnValue('<div class="from"></div>');
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        template: templateSpy
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-dir></div>');
+                $compile(el);
+                expect(el.find('>.from').length).toBe(1);
+                expect(templateSpy.calls.first().args[0][0]).toBe(el[0]);
+                expect(templateSpy.calls.first().args[1].myDir).toBeDefined();
+            });
+        });
+
+        it('指令的模板使用的是指令的isolateScope', function() {
+            var linkSpy=jasmine.createSpy();
+
+             var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        scope:{
+                            isoValue:'=myDir'
+                        },
+                        template: '<div my-oir></div>'
+                    };
+                },
+                myOir:function(){
+                    return {
+                        link:linkSpy
+                    };
+                }
+            });
+            injector.invoke(function($compile,$rootScope) {
+                var el = $('<div my-dir="42"></div>');
+                $compile(el)($rootScope);
+                expect(linkSpy.calls.first().args[0]).not.toBe($rootScope);
+                expect(linkSpy.calls.first().args[0].isoValue).toBe(42);
+            });
+
+        });
+
+
 
 
 

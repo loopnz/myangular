@@ -18,19 +18,23 @@ function $ControllerProvider() {
 
         return function(ctrl, locals, later, identifier) {
             if (_.isString(ctrl)) {
+                var match = ctrl.match(/^(\S+)(\s+as\s+(\w+))?/);
+                ctrl = match[1];
+                identifier = identifier || match[3];
                 if (controllers.hasOwnProperty(ctrl)) {
                     ctrl = controllers[ctrl];
-                } else if (globals) {
-                    ctrl = window[ctrl];
+                } else {
+                    ctrl =(locals&&locals.$scope&&locals.$scope[ctrl])||
+                    (globals&&window[ctrl]);
                 }
 
             }
             var instance;
             if (later) {
-            	var ctrlConstructor = _.isArray(ctrl)?_.last(ctrl):ctrl;
+                var ctrlConstructor = _.isArray(ctrl) ? _.last(ctrl) : ctrl;
                 instance = Object.create(ctrlConstructor.prototype);
-                if(identifier){
-                	addToScope(locals,identifier,instance);
+                if (identifier) {
+                    addToScope(locals, identifier, instance);
                 }
                 return _.extend(function() {
                     $injector.invoke(ctrl, instance, locals);
