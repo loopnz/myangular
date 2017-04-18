@@ -35,6 +35,13 @@ describe('angular API', function() {
         expect(injector.has('$compile')).toBe(true);
     });
 
+       it('安装$q服务', function() {
+        publishExternalAPI();
+        var injector=createInjector(['ng']);
+        expect(injector.has('$q')).toBe(true);
+    });
+
+
     it('安装$controller服务', function() {
          publishExternalAPI();
         var injector=createInjector(['ng']);
