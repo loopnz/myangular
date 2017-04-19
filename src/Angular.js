@@ -32,7 +32,10 @@ _.mixin({
     },
     kebabCase:createCompounder(function(result, word, index) {
         return result + (index ? '-' : '') + word.toLowerCase();
-    })
+    }),
+    trim:function(str){
+      return String.prototype.trim.call(str);
+    }
 });
 
 

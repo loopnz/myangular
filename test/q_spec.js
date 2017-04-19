@@ -1,11 +1,12 @@
 describe('$q服务(promise)', function() {
 
-    var $q, $rootScope;
+    var $q, $$q, $rootScope;
 
     beforeEach(function() {
         publishExternalAPI();
         var injector = createInjector(['ng']);
         $q = injector.get('$q');
+        $$q = injector.get('$$q');
         $rootScope = injector.get('$rootScope');
     });
 
@@ -524,5 +525,107 @@ describe('$q服务(promise)', function() {
         expect(rejectedSpy).not.toHaveBeenCalled();
     });
 
+    describe('Deferred的all方法', function() {
+
+        it('解决数组中全部的promise', function() {
+            var promise = $q.all([$q.when(1), $q.when(2), $q.when(3)]);
+            var fulfilledSpy = jasmine.createSpy();
+            promise.then(fulfilledSpy);
+            $rootScope.$apply();
+            expect(fulfilledSpy).toHaveBeenCalledWith([1, 2, 3]);
+        });
+
+        it('解决对象中全部的promise', function() {
+            var promise = $q.all({ a: $q.when(1), b: $q.when(2) });
+            var fulfilledSpy = jasmine.createSpy();
+            promise.then(fulfilledSpy);
+            $rootScope.$apply();
+            expect(fulfilledSpy).toHaveBeenCalledWith({ a: 1, b: 2 });
+        });
+
+        it('解决数组|对象中全部的promise，数组|对象为空立即解决', function() {
+            var promise = $q.all({});
+            var fulfilledSpy = jasmine.createSpy();
+            promise.then(fulfilledSpy);
+            $rootScope.$apply();
+            expect(fulfilledSpy).toHaveBeenCalledWith({});
+
+        });
+
+        it('解决数组|对象中全部的promise，数组|对象任意1个promise reject结果为reject', function() {
+            var promise = $q.all([$q.when(1), $q.when(2), $q.reject('fail')]);
+            var fulfilledSpy = jasmine.createSpy();
+            var rejectedSpy = jasmine.createSpy();
+            promise.then(fulfilledSpy, rejectedSpy);
+            $rootScope.$apply();
+            expect(rejectedSpy).toHaveBeenCalledWith('fail');
+        });
+
+        it('数组中可能不全部是promise对象的情况处理', function() {
+            var promise = $q.all([$q.when(1), 2, 3]);
+            var fulfilledSpy = jasmine.createSpy();
+            var rejectedSpy = jasmine.createSpy();
+            promise.then(fulfilledSpy, rejectedSpy);
+            $rootScope.$apply();
+            expect(fulfilledSpy).toHaveBeenCalledWith([1, 2, 3]);
+        });
+    });
+
+
+    describe('ES6形式的promise', function() {
+
+        it('$q是函数', function() {
+            expect($q instanceof Function).toBe(true);
+        });
+
+        it('$q返回promise', function() {
+            expect($q(_.noop)).toBeDefined();
+            expect($q(_.noop).then).toBeDefined();
+        });
+
+    });
+
+    describe('不使用$digest的promise服务$$q', function() {
+
+        beforeEach(function() {
+            jasmine.clock().install();
+        });
+
+        afterEach(function() {
+            jasmine.clock().uninstall();
+        });
+
+
+        it('deferred对象的resolve内部不使用digest', function() {
+            var d = $$q.defer();
+            var fulfilledSpy = jasmine.createSpy();
+            d.promise.then(fulfilledSpy);
+            d.resolve('ok');
+            $rootScope.$apply();
+            expect(fulfilledSpy).not.toHaveBeenCalled();
+        });
+
+        it('使用resolve解决', function() {
+            var d = $$q.defer();
+            var fulfilledSpy = jasmine.createSpy();
+            d.promise.then(fulfilledSpy);
+            d.resolve('ok');
+            jasmine.clock().tick(1);
+            expect(fulfilledSpy).toHaveBeenCalledWith('ok');
+        });
+
+        it('不执行digest', function() {
+            var d = $$q.defer();
+            d.promise.then(_.noop);
+            d.resolve('ok');
+            var watchSpy = jasmine.createSpy();
+            $rootScope.$watch(watchSpy);
+            jasmine.clock().tick(1);
+            expect(watchSpy).not.toHaveBeenCalled();
+        });
+
+
+
+    });
 
 });
