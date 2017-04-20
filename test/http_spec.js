@@ -1,12 +1,13 @@
 describe('$http服务', function() {
 
-    var $http;
+    var $http, $rootScope;
     var xhr, requests;
 
     beforeEach(function() {
         publishExternalAPI();
         var injector = createInjector(['ng']);
         $http = injector.get('$http');
+        $rootScope = injector.get('$rootScope');
     });
     beforeEach(function() {
         xhr = sinon.useFakeXMLHttpRequest();
@@ -35,6 +36,7 @@ describe('$http服务', function() {
             url: 'http://www.baidu.com',
             data: 'hello'
         });
+        $rootScope.$apply();
         expect(requests.length).toBe(1);
         expect(requests[0].method).toBe('POST');
         expect(requests[0].url).toBe('http://www.baidu.com');
@@ -51,7 +53,7 @@ describe('$http服务', function() {
         $http(requestConfig).then(function(r) {
             response = r;
         });
-
+        $rootScope.$apply();
         requests[0].respond(200, {}, 'Hello');
         expect(response).toBeDefined();
         expect(response.status).toBe(200);
@@ -72,7 +74,7 @@ describe('$http服务', function() {
         }).catch(function(r) {
             response = r;
         });
-
+        $rootScope.$apply();
         requests[0].respond(401, {}, 'Fail');
         expect(response).toBeDefined();
         expect(response.status).toBe(401);
@@ -92,7 +94,7 @@ describe('$http服务', function() {
         }).catch(function(r) {
             response = r;
         });
-
+        $rootScope.$apply();
         requests[0].onerror();
         expect(response).toBeDefined();
         expect(response.status).toBe(0);
@@ -107,6 +109,7 @@ describe('$http服务', function() {
             url: 'http://teropa.info'
         };
         $http(requestConfig);
+        $rootScope.$apply();
         expect(requests.length).toBe(1);
         expect(requests[0].method).toBe('GET');
     });
@@ -119,6 +122,7 @@ describe('$http服务', function() {
                 'Cache-Control': 'no-cache'
             }
         });
+        $rootScope.$apply();
         expect(requests.length).toBe(1);
         expect(requests[0].requestHeaders.Accept).toBe('text/plain');
         expect(requests[0].requestHeaders['Cache-Control']).toBe('no-cache');
@@ -128,6 +132,7 @@ describe('$http服务', function() {
         $http({
             url: 'http://terop.info'
         });
+        $rootScope.$apply();
         expect(requests.length).toBe(1);
         expect(requests[0].requestHeaders.Accept).toBe('application/json,text/plain,*/*');
     });
@@ -138,6 +143,7 @@ describe('$http服务', function() {
             url: 'http://terop.info',
             data: '42'
         });
+        $rootScope.$apply();
         expect(requests.length).toBe(1);
         expect(requests[0].requestHeaders['Content-Type']).toBe('application/json;charset=utf-8');
     });
@@ -149,6 +155,7 @@ describe('$http服务', function() {
             url: 'http://terop.info',
             data: '42'
         });
+        $rootScope.$apply();
         expect(requests.length).toBe(1);
         expect(requests[0].requestHeaders['Content-Type']).toBe('text/plain;charset=utf-8');
 
@@ -160,11 +167,13 @@ describe('$http服务', function() {
             $httpProvider.defaults.headers.post['Content-Type'] = 'text/plain;charset=utf-8';
         }]);
         $http = injector.get('$http');
+        $rootScope = injector.get('$rootScope');
         $http({
             method: 'POST',
             url: 'http://terop.info',
             data: '42'
         });
+        $rootScope.$apply();
         expect(requests.length).toBe(1);
         expect(requests[0].requestHeaders['Content-Type']).toBe('text/plain;charset=utf-8');
 
@@ -179,6 +188,7 @@ describe('$http服务', function() {
                 'content-type': 'text/plain;charset=utf-8'
             }
         });
+        $rootScope.$apply();
         expect(requests.length).toBe(1);
         expect(requests[0].requestHeaders['Content-Type']).toBeUndefined();
 
@@ -192,6 +202,7 @@ describe('$http服务', function() {
                 'Content-Type': 'application/json;charset=utf-8'
             }
         });
+        $rootScope.$apply();
         expect(requests.length).toBe(1);
         expect(requests[0].requestHeaders['Content-Type']).not.toBe('application/json;charset=utf-8');
     });
@@ -205,6 +216,7 @@ describe('$http服务', function() {
             data: '42'
         };
         $http(request);
+        $rootScope.$apply();
         expect(contentSpy).toHaveBeenCalledWith(request);
         expect(requests[0].requestHeaders['Content-Type']).toBe('text/plain;charset=utf-8');
     });
@@ -219,6 +231,7 @@ describe('$http服务', function() {
         $http(request).then(function(r) {
             response = r;
         });
+        $rootScope.$apply();
         requests[0].respond(200, { 'Content-Type': 'text/plain' }, 'Hello');
         expect(response.headers).toBeDefined();
         expect(response.headers instanceof Function).toBe(true);
@@ -233,6 +246,7 @@ describe('$http服务', function() {
             data: 42,
             withCredentials: true
         });
+        $rootScope.$apply();
         expect(requests[0].withCredentials).toBe(true);
     });
 
@@ -244,7 +258,504 @@ describe('$http服务', function() {
             data: 42,
             withCredentials: true
         });
+        $rootScope.$apply();
         expect(requests[0].withCredentials).toBe(true);
     });
 
+
+    it('转换请求(transform request)', function() {
+        $http({
+            method: 'POST',
+            url: "http://ter",
+            data: 42,
+            transformRequest: function(data) {
+                return '*' + data + '*';
+            }
+        });
+        $rootScope.$apply();
+        expect(requests[0].requestBody).toBe('*42*');
+
+    });
+
+    it('允许多个请求转换函数', function() {
+        $http({
+            method: 'POST',
+            url: "http://ter",
+            data: 42,
+            transformRequest: [function(data) {
+                return '*' + data + '*';
+            }, function(data) {
+                return '-' + data + '-';
+            }]
+        });
+        $rootScope.$apply();
+        expect(requests[0].requestBody).toBe('-*42*-');
+    });
+
+    it('设置默认请求转换函数', function() {
+        $http.defaults.transformRequest = [function(data) {
+            return "*" + data + "*";
+        }];
+        $http({
+            method: 'POST',
+            url: "http://ter",
+            data: 42,
+        });
+        $rootScope.$apply();
+        expect(requests[0].requestBody).toBe('*42*');
+
+    });
+
+    it('将headers传入请求转换函数', function() {
+        $http.defaults.transformRequest = [function(data, headers) {
+            if (headers('Content-Type') === 'text/emphasized') {
+                return '*' + data + '*';
+            } else {
+                return data;
+            }
+        }];
+        $http({
+            method: 'POST',
+            url: "http://ter",
+            data: 42,
+            headers: {
+                'Content-Type': 'text/emphasized'
+            }
+        });
+        $rootScope.$apply();
+        expect(requests[0].requestBody).toBe('*42*');
+
+    });
+
+    it('设置响应转换函数', function() {
+        var response;
+        $http({
+            method: 'POST',
+            url: "http://ter",
+            data: 42,
+            transformResponse: function(data) {
+                return '*' + data + '*';
+            }
+        }).then(function(r) {
+            response = r;
+        });
+        $rootScope.$apply();
+        requests[0].respond(200, { 'Content-Type': 'text/plain' }, 'Hello');
+        expect(response.data).toEqual('*Hello*');
+    });
+
+    it('将响应头传递给响应转换函数', function() {
+        var response;
+        $http({
+            method: 'POST',
+            url: "http://ter",
+            data: 42,
+            transformResponse: function(data, headers) {
+                if (headers('content-type') === 'text/decorated') {
+                    return '*' + data + '*';
+                } else {
+                    return data;
+                }
+            }
+        }).then(function(r) {
+            response = r;
+        });
+        $rootScope.$apply();
+        requests[0].respond(200, { 'Content-Type': 'text/decorated' }, 'Hello');
+        expect(response.data).toEqual('*Hello*');
+    });
+
+
+    it('设置默认响应转换函数', function() {
+        $http.defaults.transformResponse = [function(data) {
+            return "*" + data + "*";
+        }];
+        var response;
+        $http({
+            method: 'POST',
+            url: "http://ter",
+            data: 42,
+        }).then(function(r) {
+            response = r;
+        });
+        $rootScope.$apply();
+        requests[0].respond(200, { 'Content-Type': 'text/plain' }, 'Hello');
+        expect(response.data).toBe('*Hello*');
+
+    });
+
+    it('错误的响应也转换', function() {
+        var response;
+        $http({
+            method: 'POST',
+            url: "http://ter",
+            data: 42,
+            transformResponse: function(data, headers) {
+                return '*' + data + '*';
+            }
+        }).catch(function(r) {
+            response = r;
+        });
+        $rootScope.$apply();
+        requests[0].respond(401, { 'Content-Type': 'text/plain' }, 'Fail');
+        expect(response.data).toBe('*Fail*');
+    });
+
+    it('将http响应码也传递给响应转换函数', function() {
+        var response;
+        $http({
+            url: "http://ter",
+            transformResponse: function(data, headers, status) {
+                if (status === 401) {
+                    return 'unauthorized';
+                } else {
+                    return data;
+                }
+            }
+        }).catch(function(r) {
+            response = r;
+        });
+        $rootScope.$apply();
+        requests[0].respond(401, { 'Content-Type': 'text/plain' }, 'Fail');
+        expect(response.data).toBe('unauthorized');
+    });
+
+    it('序列化请求的data(data为js 对象)', function() {
+        $http({
+            url: "http://ter",
+            method: 'POST',
+            data: { aKey: 42 }
+        });
+        $rootScope.$apply();
+        expect(requests[0].requestBody).toEqual('{"aKey":42}');
+    });
+    it('序列化请求的data(data为js 数组)', function() {
+        $http({
+            url: "http://ter",
+            method: 'POST',
+            data: [1, 'two', 3]
+        });
+        $rootScope.$apply();
+        expect(requests[0].requestBody).toEqual('[1,"two",3]');
+    });
+
+    it('序列化请求的data(如果data是blob对象,不处理)', function() {
+        var blob = new Blob(['abc']);
+        $http({
+            url: "http://ter",
+            method: 'POST',
+            data: blob
+        });
+        $rootScope.$apply();
+        expect(requests[0].requestBody).toBe(blob);
+    });
+
+    it('序列化请求的data(如果data是form对象,不处理)', function() {
+        var form = new FormData();
+        form.append('a', 'value');
+        $http({
+            url: "http://ter",
+            method: 'POST',
+            data: form
+        });
+        $rootScope.$apply();
+        expect(requests[0].requestBody).toBe(form);
+    });
+
+
+    it('解析响应的json格式的数据', function() {
+
+        var response;
+        $http({
+            method: 'GET',
+            url: "http://ter"
+        }).then(function(r) {
+            response = r;
+        });
+        $rootScope.$apply();
+        requests[0].respond(200, { 'Content-Type': 'application/json' }, '{"message":"hello"}');
+        expect(response.data.message).toBe('hello');
+    });
+
+    it('返回格式是json格式对象,但是没有设置content-type', function() {
+        var response;
+        $http({
+            method: 'GET',
+            url: "http://ter"
+        }).then(function(r) {
+            response = r;
+        });
+        $rootScope.$apply();
+        requests[0].respond(200, {}, '{"message":"hello"}');
+        expect(response.data.message).toBe('hello');
+    });
+
+
+    it('返回格式是json格式数组,但是没有设置content-type', function() {
+        var response;
+        $http({
+            method: 'GET',
+            url: "http://ter"
+        }).then(function(r) {
+            response = r;
+        }).catch(function(r) {
+            console.log(r);
+        });
+        $rootScope.$apply();
+        requests[0].respond(200, {}, '[1,2,4]');
+        expect(response.data).toEqual([1, 2, 4]);
+    });
+
+    it('不解析插值-json形式的响应数据', function() {
+        var response;
+        $http({
+            method: 'GET',
+            url: "http://ter"
+        }).then(function(r) {
+            response = r;
+        });
+        $rootScope.$apply();
+        requests[0].respond(200, {}, '{{expr}}');
+        expect(response.data).toEqual('{{expr}}');
+
+    });
+
+    it('增加参数到url', function() {
+        $http({
+            url: "http://ac",
+            params: {
+                a: 42
+            }
+        });
+        $rootScope.$apply();
+        expect(requests[0].url).toBe('http://ac?a=42');
+    });
+    it('增加额外的参数到url', function() {
+        $http({
+            url: "http://ac?a=42",
+            params: {
+                b: 42
+            }
+        });
+        $rootScope.$apply();
+        expect(requests[0].url).toBe('http://ac?a=42&b=42');
+    });
+
+    it('escapse url', function() {
+        $http({
+            url: "http://ac",
+            params: {
+                '==': '&&'
+            }
+        });
+        $rootScope.$apply();
+        expect(requests[0].url).toBe('http://ac?%3D%3D=%26%26');
+    });
+
+    it('不添加null或undefined的参数', function() {
+        $http({
+            url: "http://ac",
+            params: {
+                a: null,
+                b: undefined
+            }
+        });
+        $rootScope.$apply();
+        expect(requests[0].url).toBe('http://ac');
+    });
+
+
+    it('添加数组形式的参数', function() {
+        $http({
+            url: "http://ac",
+            params: {
+                a: [1, 2, 3],
+            }
+        });
+        $rootScope.$apply();
+        expect(requests[0].url).toBe('http://ac?a=1&a=2&a=3');
+    });
+
+    it('参数如果是js对象,序列化为json格式字符串', function() {
+        $http({
+            url: "http://ac",
+            params: {
+                a: { b: 42 },
+            }
+        });
+        $rootScope.$apply();
+        expect(requests[0].url).toBe('http://ac?a=%7B%22b%22%3A42%7D');
+    });
+
+    it('添加子参数解析器', function() {
+        $http({
+            url: "http://ac",
+            params: {
+                a: 42,
+                b: 43
+            },
+            paramSerializer: function(params) {
+                return _.map(params, function(v, k) {
+                    return k + '=' + v + 'lol';
+                }).join('&');
+            }
+        });
+        $rootScope.$apply();
+        expect(requests[0].url).toBe('http://ac?a=42lol&b=43lol');
+    });
+
+    it('允许通过依赖注入注入param serializer', function() {
+        var injector = createInjector(['ng', function($provide) {
+            $provide.factory('mySpecialSerializer', function() {
+
+                return function(params) {
+                    return _.map(params, function(v, k) {
+                        return k + '=' + v + 'lol';
+                    }).join("&");
+                };
+            });
+        }]);
+
+        injector.invoke(function($http, $rootScope) {
+            $http({
+                url: "http://ac",
+                params: {
+                    a: 42,
+                    b: 43
+                },
+                paramSerializer: 'mySpecialSerializer'
+            });
+            $rootScope.$apply();
+        });
+
+        expect(requests[0].url).toBe('http://ac?a=42lol&b=43lol');
+
+    });
+
+    it('依赖注入默认的param serializer', function() {
+        var injector = createInjector(['ng']);
+        injector.invoke(function($httpParamSerializer) {
+            var result = $httpParamSerializer({ a: 42, b: 43 });
+            expect(result).toEqual('a=42&b=43');
+        });
+    });
+
+    it('使用jquery形式的param serializer', function() {
+        $http({
+            url: "http://ac",
+            params: {
+                a: 42,
+                b: 43
+            },
+            paramSerializer: '$httpParamSerializerJQLike'
+        });
+        $rootScope.$apply();
+        expect(requests[0].url).toEqual('http://ac?a=42&b=43');
+    });
+
+    it('支持$http.get', function() {
+        $http.get('http://a', {
+            params: { q: 42 }
+        });
+        $rootScope.$apply();
+        expect(requests[0].url).toBe('http://a?q=42');
+        expect(requests[0].method).toBe('GET');
+    });
+
+    it('添加拦截器(interceptor)', function() {
+        var interceptorFactorySpy = jasmine.createSpy();
+        var injector = createInjector(['ng', function($httpProvider) {
+            $httpProvider.interceptors.push(interceptorFactorySpy);
+        }]);
+        var http = injector.get('$http');
+        expect(interceptorFactorySpy).toHaveBeenCalled();
+    });
+
+    it('给拦截器注入依赖', function() {
+        var interceptorFactorySpy = jasmine.createSpy();
+        var injector = createInjector(['ng', function($httpProvider) {
+            $httpProvider.interceptors.push(['$rootScope', interceptorFactorySpy]);
+        }]);
+        var http = injector.get('$http');
+        var $rootScope = injector.get('$rootScope');
+        expect(interceptorFactorySpy).toHaveBeenCalledWith($rootScope);
+    });
+
+    it('使用普通的factory服务注册拦截器', function() {
+        var spy = jasmine.createSpy().and.returnValue({});
+        var injector = createInjector(['ng', function($httpProvider, $provide) {
+            $provide.factory('myInterceptor', spy);
+            $httpProvider.interceptors.push('myInterceptor');
+        }]);
+        var http = injector.get('$http');
+        var $rootScope = injector.get('$rootScope');
+        expect(spy).toHaveBeenCalled();
+    });
+
+    it('允许拦截请求', function() {
+        var injector = createInjector(['ng', function($httpProvider, $provide) {
+            $httpProvider.interceptors.push(function() {
+                return {
+                    request: function(config) {
+                        config.params.intercepted = true;
+                        return config;
+                    }
+                };
+            });
+        }]);
+
+        var http = injector.get('$http');
+        var $rootScope = injector.get('$rootScope');
+        http.get('http://a', {
+            params: {}
+        });
+        $rootScope.$apply();
+        expect(requests[0].url).toBe('http://a?intercepted=true');
+    });
+
+    it('允许request拦截器返回promise', function() {
+        var injector = createInjector(['ng', function($httpProvider, $provide) {
+            $httpProvider.interceptors.push(function($q) {
+                return {
+                    request: function(config) {
+                        config.params.intercepted = true;
+                        return $q.when(config);
+                    }
+                };
+            });
+        }]);
+
+        var http = injector.get('$http');
+        var $rootScope = injector.get('$rootScope');
+        http.get('http://a', {
+            params: {}
+        });
+        $rootScope.$apply();
+        expect(requests[0].url).toBe('http://a?intercepted=true');
+    });
+
+    it('允许添加响应拦截器', function() {
+    	 var response;
+    	 var injector = createInjector(['ng', function($httpProvider, $provide) {
+            $httpProvider.interceptors.push(function() {
+                return {
+                    response: function(response) {
+                        response.intercepted = true;
+                        return response;
+                    }
+                };
+            });
+        }]);
+
+        var http = injector.get('$http');
+        var $rootScope = injector.get('$rootScope');
+        http.get('http://a', {
+            params: {}
+        }).then(function(r){
+        	response=r;
+        });
+        $rootScope.$apply();
+        requests[0].respond(200,{},'Hello');
+        expect(response.intercepted).toBe(true);
+    });
 });
