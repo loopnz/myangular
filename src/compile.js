@@ -65,7 +65,7 @@ function $CompileProvider($provide) {
         return bindings;
     }
 
-    this.$get = ['$injector', '$rootScope', '$parse', '$controller', function($injector, $rootScope, $parse, $controller) {
+    this.$get = ['$injector', '$rootScope', '$parse', '$controller', '$http', function($injector, $rootScope, $parse, $controller, $http) {
 
         function Attributes(element) {
             this.$$element = element;
@@ -317,7 +317,7 @@ function $CompileProvider($provide) {
                 }
             }
 
-            _.forEach(directives, function(directive) {
+            _.forEach(directives, function(directive, i) {
                 if (directive.$$start) {
                     $compileNode = groupScan(node, directive.$$start, directive.$$end);
                 }
@@ -343,18 +343,7 @@ function $CompileProvider($provide) {
                     controllerDirectives = controllerDirectives || {};
                     controllerDirectives[directive.name] = directive;
                 }
-                if (directive.compile) {
-                    var linkFn = directive.compile($compileNode, attrs);
-                    var isolateScope = (directive === newIsolateScopeDirective);
-                    var attrStart = directive.$$start;
-                    var attrEnd = directive.$$end;
-                    var require = directive.require;
-                    if (_.isFunction(linkFn)) {
-                        addLinkFns(null, linkFn, attrStart, attrEnd, isolateScope, require);
-                    } else if (linkFn) {
-                        addLinkFns(linkFn.pre, linkFn.post, attrStart, attrEnd, isolateScope, require);
-                    }
-                }
+
                 if (directive.terminal) {
                     terminal = true;
                     terminalPriority = directive.priority;
@@ -372,7 +361,36 @@ function $CompileProvider($provide) {
                     }
 
                 }
+                if (directive.templateUrl) {
+                    compileTemplateUrl(_.drop(directives, i), $compileNode, attrs);
+                    return false;
+                } else if (directive.compile) {
+                    var linkFn = directive.compile($compileNode, attrs);
+                    var isolateScope = (directive === newIsolateScopeDirective);
+                    var attrStart = directive.$$start;
+                    var attrEnd = directive.$$end;
+                    var require = directive.require;
+                    if (_.isFunction(linkFn)) {
+                        addLinkFns(null, linkFn, attrStart, attrEnd, isolateScope, require);
+                    } else if (linkFn) {
+                        addLinkFns(linkFn.pre, linkFn.post, attrStart, attrEnd, isolateScope, require);
+                    }
+                }
             });
+
+            function compileTemplateUrl(directives, $compileNode, attrs) {
+                var origAsyncDirective = directives.shift();
+                var derivedSyncDirective = _.extend({},
+                    origAsyncDirective, { templateUrl: null }
+                );
+                $compileNode.empty();
+                $http.get(origAsyncDirective.templateUrl).success(function(template) {
+                    directives.unshift(derivedSyncDirective);
+                    $compileNode.html(template);
+                    applyDirectivesToNode(directives, $compileNode, attrs);
+                    compileNodes($compileNode[0].childNodes);
+                });
+            }
 
             function nodeLinkFn(childLinkFn, scope, linkNode) {
                 var $element = $(linkNode);

@@ -2167,24 +2167,24 @@ describe('指令(directive)--$compile', function() {
         });
 
         it('指令的模板使用的是指令的isolateScope', function() {
-            var linkSpy=jasmine.createSpy();
+            var linkSpy = jasmine.createSpy();
 
-             var injector = makeInjectorWithDirectives({
+            var injector = makeInjectorWithDirectives({
                 myDir: function() {
                     return {
-                        scope:{
-                            isoValue:'=myDir'
+                        scope: {
+                            isoValue: '=myDir'
                         },
                         template: '<div my-oir></div>'
                     };
                 },
-                myOir:function(){
+                myOir: function() {
                     return {
-                        link:linkSpy
+                        link: linkSpy
                     };
                 }
             });
-            injector.invoke(function($compile,$rootScope) {
+            injector.invoke(function($compile, $rootScope) {
                 var el = $('<div my-dir="42"></div>');
                 $compile(el)($rootScope);
                 expect(linkSpy.calls.first().args[0]).not.toBe($rootScope);
@@ -2192,9 +2192,184 @@ describe('指令(directive)--$compile', function() {
             });
 
         });
+    });
 
+    describe('异步指令模板', function() {
 
+        it('延迟编译', function() {
+            var spy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        templateUrl: '/my_directive.html'
+                    };
+                },
+                myOir: function() {
+                    return {
+                        compile: spy
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-dir my-oir></div>');
+                $compile(el);
+                expect(spy).not.toHaveBeenCalled();
+            });
+        });
 
+        it('延迟当前指令编译', function() {
+            var spy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        templateUrl: '/my_directive.html',
+                        compile: spy
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-dir></div>');
+                $compile(el);
+                expect(spy).not.toHaveBeenCalled();
+            });
+        });
+
+        it('立即清空元素', function() {
+            var spy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        templateUrl: '/my_directive.html'
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-dir>hello</div>');
+                $compile(el);
+                expect(el.is(':empty')).toBe(true);
+            });
+        });
+    });
+    describe('异步加载指令模板', function() {
+        var xhr, requests;
+
+        beforeEach(function() {
+            xhr = sinon.useFakeXMLHttpRequest();
+            requests = [];
+            xhr.onCreate = function(req) {
+                requests.push(req);
+            };
+        });
+
+        afterEach(function() {
+            xhr.restore();
+        });
+
+        it('加载模板', function() {
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        templateUrl: '/my_directive.html'
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir></div>');
+                $compile(el);
+                $rootScope.$apply();
+                expect(requests.length).toBe(1);
+                expect(requests[0].method).toBe('GET');
+            });
+
+        });
+
+        it('将模板放入指令根元素', function() {
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        templateUrl: '/my_directive.html'
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir></div>');
+                $compile(el);
+                $rootScope.$apply();
+                requests[0].respond(200, {}, '<div class="from"><div>');
+                expect(el.find('>.from').length).toBe(1);
+            });
+
+        });
+
+        it('模板加载后编译此模板', function() {
+            var compileSpy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        templateUrl: '/my_directive.html',
+                        compile: compileSpy
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir></div>');
+                $compile(el);
+                $rootScope.$apply();
+                requests[0].respond(200, {}, '<div class="from"><div>');
+                expect(compileSpy).toHaveBeenCalled();
+            });
+        });
+
+        it('模板加载后重启编译过程', function() {
+            var compileSpy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        templateUrl: '/my_directive.html'
+                    };
+                },
+                myOir: function() {
+                    return {
+                        compile: compileSpy
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir my-oir></div>');
+                $compile(el);
+                $rootScope.$apply();
+                requests[0].respond(200, {}, '<div class="from"><div>');
+                expect(compileSpy).toHaveBeenCalled();
+            });
+        });
+
+        it('模板加载后重启子元素的编译过程', function() {
+            var compileSpy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        templateUrl: '/my_directive.html'
+                    };
+                },
+                myOir: function() {
+                    return {
+                        compile: compileSpy
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir></div>');
+                $compile(el);
+                $rootScope.$apply();
+                requests[0].respond(200, {}, '<div my-oir class="from"><div>');
+                expect(compileSpy).toHaveBeenCalled();
+            });
+        });
 
 
     });

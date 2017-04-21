@@ -1,6 +1,6 @@
 describe('$http服务', function() {
 
-    var $http, $rootScope;
+    var $http, $rootScope, $q;
     var xhr, requests;
 
     beforeEach(function() {
@@ -8,6 +8,7 @@ describe('$http服务', function() {
         var injector = createInjector(['ng']);
         $http = injector.get('$http');
         $rootScope = injector.get('$rootScope');
+        $q = injector.get('$q');
     });
     beforeEach(function() {
         xhr = sinon.useFakeXMLHttpRequest();
@@ -18,6 +19,13 @@ describe('$http服务', function() {
     });
     afterEach(function() {
         xhr.restore();
+    });
+
+    beforeEach(function() {
+        jasmine.clock().install();
+    });
+    afterEach(function() {
+        jasmine.clock().uninstall();
     });
 
     it('$http服务是个函数', function() {
@@ -735,8 +743,8 @@ describe('$http服务', function() {
     });
 
     it('允许添加响应拦截器', function() {
-    	 var response;
-    	 var injector = createInjector(['ng', function($httpProvider, $provide) {
+        var response;
+        var injector = createInjector(['ng', function($httpProvider, $provide) {
             $httpProvider.interceptors.push(function() {
                 return {
                     response: function(response) {
@@ -751,11 +759,110 @@ describe('$http服务', function() {
         var $rootScope = injector.get('$rootScope');
         http.get('http://a', {
             params: {}
-        }).then(function(r){
-        	response=r;
+        }).then(function(r) {
+            response = r;
         });
         $rootScope.$apply();
-        requests[0].respond(200,{},'Hello');
+        requests[0].respond(200, {}, 'Hello');
         expect(response.intercepted).toBe(true);
+    });
+
+    it('添加success处理函数', function() {
+        var data, status, headers, config;
+        $http.get('http://').success(function(d, s, h, c) {
+            data = d;
+            statis = s;
+            headers = h;
+            config = c;
+        });
+        $rootScope.$apply();
+        requests[0].respond(200, { 'Cache-Control': 'no-cache' }, 'Hello');
+        $rootScope.$apply();
+        expect(data).toBe('Hello');
+        expect(config.method).toBe('GET');
+    });
+    it('添加error处理函数', function() {
+        var data, status, headers, config;
+        $http.get('http://').error(function(d, s, h, c) {
+            data = d;
+            statis = s;
+            headers = h;
+            config = c;
+        });
+        $rootScope.$apply();
+        requests[0].respond(401, { 'Cache-Control': 'no-cache' }, 'Fail');
+        $rootScope.$apply();
+        expect(data).toBe('Fail');
+    });
+
+    it('允许终止request', function() {
+        var timeout = $q.defer();
+        $http.get('http://', {
+            timeout: timeout.promise
+        });
+        $rootScope.$apply();
+        timeout.resolve();
+        $rootScope.$apply();
+        expect(requests[0].aborted).toBe(true);
+    });
+
+    it('允许超时后终止request', function() {
+        var timeout = $q.defer();
+        $http.get('http://', {
+            timeout: 5000
+        });
+        $rootScope.$apply();
+        jasmine.clock().tick(5001);
+        expect(requests[0].aborted).toBe(true);
+    });
+
+    describe('查看当前有多少请求', function() {
+
+        it('添加request', function() {
+            $http.get('http://a');
+            $rootScope.$apply();
+            expect($http.pendingRequests).toBeDefined();
+            expect($http.pendingRequests.length).toBe(1);
+            expect($http.pendingRequests[0].url).toBe('http://a');
+            requests[0].respond(200, {}, 'OK');
+            $rootScope.$apply();
+            expect($http.pendingRequests.length).toBe(0);
+        });
+
+        it('清理失败的链接', function() {
+            $http.get('http://a');
+            $rootScope.$apply();
+            requests[0].respond(404, {}, 'Not found');
+            $rootScope.$apply();
+            expect($http.pendingRequests.length).toBe(0);
+        });
+    });
+
+    describe('组合$applyAsync', function() {
+        beforeEach(function() {
+            var injector = createInjector(['ng', function($httpProvider) {
+                $httpProvider.useApplyAsync(true);
+            }]);
+            $http = injector.get('$http');
+            $rootScope = injector.get('$rootScope');
+        });
+
+        it('当开启功能是不立刻解决promise', function() {
+            var resolveSpy = jasmine.createSpy();
+            $http.get('http://a').then(resolveSpy);
+            $rootScope.$apply();
+            requests[0].respond(200, {}, 'OK');
+            expect(resolveSpy).not.toHaveBeenCalled();
+        });
+
+        it('延后一段时间resolve promise ', function() {
+            var resolveSpy = jasmine.createSpy();
+            $http.get('http://a').then(resolveSpy);
+            $rootScope.$apply();
+            requests[0].respond(200, {}, 'OK');
+            jasmine.clock().tick(100);
+            expect(resolveSpy).toHaveBeenCalled();
+        });
+
     });
 });
