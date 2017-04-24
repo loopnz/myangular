@@ -2371,6 +2371,435 @@ describe('指令(directive)--$compile', function() {
             });
         });
 
+        it('支持templateUrl是函数', function() {
+            var templateSpy = jasmine.createSpy().and.returnValue('my_dir.html');
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        templateUrl: templateSpy
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir></div>');
+                $compile(el);
+                $rootScope.$apply();
+                expect(requests[0].url).toBe('my_dir.html');
+                expect(templateSpy.calls.first().args[0][0]).toBe(el[0]);
+                expect(templateSpy.calls.first().args[1].myDir).toBeDefined();
+            });
+
+        });
+        it('对于单个个元素,不允许拥有templateUrl的指令出现在有template的指令之后', function() {
+            var templateSpy = jasmine.createSpy().and.returnValue('my_dir.html');
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        template: '<div></div>'
+                    };
+                },
+                myOir: function() {
+                    return { templateUrl: "<div></div>" };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir my-oir ></div>');
+                expect(function() {
+                    $compile(el);
+                }).toThrow();
+            });
+
+        });
+
+        it('对于单个个元素,不允许拥有template的指令出现在有templateUrl的指令之后', function() {
+            var templateSpy = jasmine.createSpy().and.returnValue('my_dir.html');
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+
+                        templateUrl: "/my_dir.html"
+                    };
+                },
+                myOir: function() {
+                    return { template: '<div></div>' };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir my-oir ></div>');
+                $compile(el);
+                $rootScope.$apply();
+                requests[0].respond(200, {}, '<div class="rep"></div>');
+                expect(el.find('>.rep').length).toBe(1);
+            });
+
+        });
+        it('当pulic link 函数执行后link 指令', function() {
+            var linkSpy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        templateUrl: "/my_dir.html",
+                        link: linkSpy
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir></div>');
+                var linkFn = $compile(el);
+                $rootScope.$apply();
+                requests[0].respond(200, {}, '<div class="rep"></div>');
+                linkFn($rootScope);
+                expect(linkSpy).toHaveBeenCalled();
+                expect(linkSpy.calls.first().args[0]).toBe($rootScope);
+                expect(linkSpy.calls.first().args[1][0]).toBe(el[0]);
+                expect(linkSpy.calls.first().args[2].myDir).toBeDefined();
+            });
+
+        });
+
+        it('当pulic link 函数执行后link 子元素 指令', function() {
+            var linkSpy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+
+                        templateUrl: "/my_dir.html"
+                    };
+                },
+                myOir: function() {
+                    return { link: linkSpy };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir></div>');
+                var linkFn = $compile(el);
+                $rootScope.$apply();
+                requests[0].respond(200, {}, '<div my-oir></div>');
+                linkFn($rootScope);
+                expect(linkSpy).toHaveBeenCalled();
+                expect(linkSpy.calls.first().args[0]).toBe($rootScope);
+                expect(linkSpy.calls.first().args[1][0]).toBe(el[0].firstChild);
+                expect(linkSpy.calls.first().args[2].myOir).toBeDefined();
+            });
+
+        });
+
+        it('有link函数的指令先编译', function() {
+            var linkSpy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        link: linkSpy
+                    };
+                },
+                myOir: function() {
+                    return { templateUrl: '/my_dir.html' };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir my-oir></div>');
+                var linkFn = $compile(el);
+                $rootScope.$apply();
+                linkFn($rootScope);
+                requests[0].respond(200, {}, '<div ></div>');
+
+                expect(linkSpy).toHaveBeenCalled();
+                expect(linkSpy.calls.argsFor(0)[0]).toBe($rootScope);
+                expect(linkSpy.calls.argsFor(0)[1][0]).toBe(el[0]);
+                expect(linkSpy.calls.argsFor(0)[2].myOir).toBeDefined();
+            });
+
+        });
+
+        it('保持有isolatescope的指令有正确的scope', function() {
+            var linkSpy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        scope: {
+                            val: '=myDir'
+                        },
+                        link: linkSpy
+                    };
+                },
+                myOir: function() {
+                    return { templateUrl: '/my_dir.html' };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir="42" my-oir></div>');
+                var linkFn = $compile(el);
+                $rootScope.$apply();
+                linkFn($rootScope);
+                requests[0].respond(200, {}, '<div ></div>');
+
+                expect(linkSpy).toHaveBeenCalled();
+                expect(linkSpy.calls.first().args[0]).toBeDefined();
+                expect(linkSpy.calls.first().args[0]).not.toBe($rootScope);
+                expect(linkSpy.calls.first().args[0].val).toBe(42);
+            });
+        });
+
+        it('对所有有controller的指令安装控制器', function() {
+            var myDired, myOired;
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        controller: function() {
+                            myDired = true;
+                        }
+                    };
+                },
+                myOir: function() {
+                    return {
+                        templateUrl: '/my_dir.html',
+                        controller: function() {
+                            myOired = true;
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir my-oir></div>');
+                var linkFn = $compile(el);
+                $rootScope.$apply();
+                linkFn($rootScope);
+                requests[0].respond(200, {}, '<div ></div>');
+
+                expect(myDired).toBe(true);
+                expect(myOired).toBe(true);
+            });
+        });
+
+    });
+
+
+    describe('嵌入式模板', function() {
+
+        it('移除指令元素的子元素', function() {
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        transclude: true
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-dir><div>must go</div></div>');
+                $compile(el);
+                expect(el.is(':empty')).toBe(true);
+            });
+        });
+
+        it('编译子元素', function() {
+            var insideSpy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        transclude: true
+                    };
+                },
+                myOir: function() {
+                    return {
+                        compile: insideSpy
+                    };
+                }
+            });
+            injector.invoke(function($compile) {
+                var el = $('<div my-dir><div my-oir>must go</div></div>');
+                $compile(el);
+                expect(insideSpy).toHaveBeenCalled();
+            });
+        });
+
+        it('将transclude内容传入link函数', function() {
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        transclude: true,
+                        template: '<div in-template></div>',
+                        link: function(scope, element, attrs, ctrl, transclude) {
+                            element.find('[in-template]').append(transclude());
+                        }
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir><div in-transcluder></div></div>');
+                $compile(el)($rootScope);
+                expect(el.find('>[in-template]>[in-transcluder]').length).toBe(1);
+            });
+        });
+
+        it('1个元素只允许1个transclude', function() {
+
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        transclude: true
+                    };
+                },
+                myOir: function() {
+                    return {
+                        transclude: true
+                    };
+                }
+            });
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir my-oir><div></div></div>');
+                expect(function() {
+                    $compile(el);
+                }).toThrow();
+            });
+
+        });
+
+
+        it('嵌入模板的指令的链接函数接收合适的scope', function() {
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        transclude: true,
+                        link: function(scope, element, attrs, ctrl, transclude) {
+                            element.append(transclude());
+                        }
+                    };
+                },
+                myOir: function() {
+                    return {
+                        link: function(scope, element) {
+                            element.html(scope.anAttr);
+                        }
+                    };
+                }
+            });
+
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir ><div my-oir></div></div>');
+                $rootScope.anAttr = 'hello from root';
+                $compile(el)($rootScope);
+                expect(el.find('>[my-oir]').html()).toBe('hello from root');
+            });
+        });
+
+        it('嵌入模板与父元素继承的scope隔绝', function() {
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        transclude: true,
+                        scope: true,
+                        link: function(scope, element, attrs, ctrl, transclude) {
+                            scope.anAttr = 'attr';
+                            element.append(transclude());
+                        }
+                    };
+                },
+                myOir: function() {
+                    return {
+                        link: function(scope, element) {
+                            element.html(scope.anAttr);
+                        }
+                    };
+                }
+            });
+
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir ><div my-oir></div></div>');
+                $rootScope.anAttr = 'hello from root';
+                $compile(el)($rootScope);
+                expect(el.find('>[my-oir]').html()).toBe('hello from root');
+            });
+
+
+        });
+
+        it('当父元素的scope销毁时,嵌入模板的scope需要解除watcher', function() {
+            var watchSpy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        transclude: true,
+                        scope: true,
+                        link: function(scope, element, attrs, ctrl, transclude) {
+                             element.append(transclude());
+                            scope.$on('destroyNow', function() {
+                                scope.$destroy();
+                            });
+                           
+                        }
+                    };
+                },
+                myOir: function() {
+                    return {
+                        link: function(scope, element) {
+                            scope.$watch(watchSpy);
+                        }
+                    };
+                }
+            });
+
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir ><div my-oir></div></div>');
+                $compile(el)($rootScope);
+                $rootScope.$apply();
+                $rootScope.$apply();
+                expect(watchSpy.calls.count()).toBe(2);
+                $rootScope.$apply();
+                expect(watchSpy.calls.count()).toBe(3);
+                $rootScope.$broadcast('destroyNow');
+                $rootScope.$apply();
+                expect(watchSpy.calls.count()).toBe(3);
+            });
+
+
+        });
+
+
+        it('允许给嵌入模板传入其他scope', function() {
+            var watchSpy = jasmine.createSpy();
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        transclude: true,
+                        scope: true,
+                        template:"<div></div>",
+                        link: function(scope, element, attrs, ctrl, transclude) {
+                            var myScope=scope.$new(true);
+                            myScope.specialAttr=42;
+                            transclude(myScope);
+                        }
+                    };
+                },
+                myOir: function() {
+                    return {
+                        link: watchSpy
+                    };
+                }
+            });
+
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir ><div my-oir></div></div>');
+                $compile(el)($rootScope);
+                var transcludedScope = watchSpy.calls.first().args[0];
+                expect(transcludedScope.specialAttr).toBe(42);
+            });
+
+
+        });
 
     });
 });

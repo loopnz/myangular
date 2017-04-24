@@ -141,6 +141,7 @@ function $CompileProvider($provide) {
             return function(scope) {
                 $compileNodes.data('$scope', scope);
                 compositeLinkFn(scope, $compileNodes);
+                return $compileNodes;
             };
         }
 
@@ -178,11 +179,23 @@ function $CompileProvider($provide) {
                 _.forEach(linkFns, function(linkFn) {
                     var node = stableNodeList[linkFn.idx];
                     if (linkFn.nodeLinkFn) {
+                        var childScope;
                         if (linkFn.nodeLinkFn.scope) {
-                            scope = scope.$new();
-                            $(node).data("$scope", scope);
+                            childScope = scope.$new();
+                            $(node).data("$scope", childScope);
+                        }else{
+                            childScope=scope;
                         }
-                        linkFn.nodeLinkFn(linkFn.childLinkFn, scope, node);
+                        var boundTranscludeFn;
+                        if(linkFn.nodeLinkFn.transcludeOnThisElement){
+                            boundTranscludeFn=function(transcludedScope,containingScope){
+                                if(!transcludedScope){
+                                    transcludedScope=scope.$new(false,containingScope);
+                                } 
+                                return linkFn.nodeLinkFn.transclude(transcludedScope);
+                            };
+                        }
+                        linkFn.nodeLinkFn(linkFn.childLinkFn, childScope, node,boundTranscludeFn);
                     } else {
                         linkFn.childLinkFn(scope, node.childNodes);
                     }
@@ -249,16 +262,20 @@ function $CompileProvider($provide) {
 
         }
 
-        function applyDirectivesToNode(directives, node, attrs) {
+        function applyDirectivesToNode(directives, node, attrs, previousCompileContext) {
+            previousCompileContext = previousCompileContext || {};
             var $compileNode = $(node);
             var terminalPriority = -Number.MAX_VALUE;
             var terminal = false;
-            var preLinkFns = [],
-                postLinkFns = [],
-                controllers = {};
-            var newScopeDirective, newIsolateScopeDirective;
-            var templateDirective;
-            var controllerDirectives;
+            var preLinkFns = previousCompileContext.preLinkFns || [];
+            var postLinkFns = previousCompileContext.postLinkFns || [];
+            var controllers = {};
+            var newScopeDirective;
+            var newIsolateScopeDirective = previousCompileContext.newIsolateScopeDirective;
+            var templateDirective = previousCompileContext.templateDirective;
+            var controllerDirectives = previousCompileContext.controllerDirectives;
+            var childTranscludeFn;
+            var hasTranscludeDirective;
 
             function getControllers(require, $element) {
 
@@ -317,82 +334,7 @@ function $CompileProvider($provide) {
                 }
             }
 
-            _.forEach(directives, function(directive, i) {
-                if (directive.$$start) {
-                    $compileNode = groupScan(node, directive.$$start, directive.$$end);
-                }
-                if (directive.priority < terminalPriority) {
-                    return false;
-                }
-                if (directive.scope) {
-                    if (_.isObject(directive.scope)) {
-                        if (newIsolateScopeDirective || newScopeDirective) {
-                            throw '多个指令都要求新建 scope';
-                        }
-                        newIsolateScopeDirective = directive;
-                    } else {
-                        if (newIsolateScopeDirective) {
-                            throw '多个指令都要求新建 scope';
-                        }
-                        newScopeDirective = newScopeDirective || directive;
-                    }
-
-                }
-
-                if (directive.controller) {
-                    controllerDirectives = controllerDirectives || {};
-                    controllerDirectives[directive.name] = directive;
-                }
-
-                if (directive.terminal) {
-                    terminal = true;
-                    terminalPriority = directive.priority;
-                }
-
-                if (directive.template) {
-                    if (templateDirective) {
-                        throw '多个指令存在模板';
-                    }
-                    templateDirective = directive;
-                    if (_.isFunction(directive.template)) {
-                        $compileNode.html(directive.template($compileNode, attrs));
-                    } else {
-                        $compileNode.html(directive.template);
-                    }
-
-                }
-                if (directive.templateUrl) {
-                    compileTemplateUrl(_.drop(directives, i), $compileNode, attrs);
-                    return false;
-                } else if (directive.compile) {
-                    var linkFn = directive.compile($compileNode, attrs);
-                    var isolateScope = (directive === newIsolateScopeDirective);
-                    var attrStart = directive.$$start;
-                    var attrEnd = directive.$$end;
-                    var require = directive.require;
-                    if (_.isFunction(linkFn)) {
-                        addLinkFns(null, linkFn, attrStart, attrEnd, isolateScope, require);
-                    } else if (linkFn) {
-                        addLinkFns(linkFn.pre, linkFn.post, attrStart, attrEnd, isolateScope, require);
-                    }
-                }
-            });
-
-            function compileTemplateUrl(directives, $compileNode, attrs) {
-                var origAsyncDirective = directives.shift();
-                var derivedSyncDirective = _.extend({},
-                    origAsyncDirective, { templateUrl: null }
-                );
-                $compileNode.empty();
-                $http.get(origAsyncDirective.templateUrl).success(function(template) {
-                    directives.unshift(derivedSyncDirective);
-                    $compileNode.html(template);
-                    applyDirectivesToNode(directives, $compileNode, attrs);
-                    compileNodes($compileNode[0].childNodes);
-                });
-            }
-
-            function nodeLinkFn(childLinkFn, scope, linkNode) {
+            var nodeLinkFn = function(childLinkFn, scope, linkNode,boundTranscludeFn) {
                 var $element = $(linkNode);
                 var isolateScope;
                 if (newIsolateScopeDirective) {
@@ -439,11 +381,18 @@ function $CompileProvider($provide) {
                 _.forEach(controllers, function(controller) {
                     controller();
                 });
+
+                function scopeBoundTranscludeFn(transcludedScope){
+                    return boundTranscludeFn(transcludedScope,scope);
+                }
+             
                 _.forEach(preLinkFns, function(linkFn) {
                     linkFn(linkFn.isolateScope ? isolateScope : scope,
                         $element,
                         attrs,
-                        linkFn.require && getControllers(linkFn.require, $element));
+                        linkFn.require && getControllers(linkFn.require, $element),
+                        scopeBoundTranscludeFn
+                    );
                 });
                 if (childLinkFn) {
                     var scopeToChild = scope;
@@ -456,11 +405,133 @@ function $CompileProvider($provide) {
                     linkFn(linkFn.isolateScope ? isolateScope : scope,
                         $element,
                         attrs,
-                        linkFn.require && getControllers(linkFn.require, $element));
+                        linkFn.require && getControllers(linkFn.require, $element),
+                        scopeBoundTranscludeFn
+                    );
                 });
+            };
+
+            _.forEach(directives, function(directive, i) {
+                if (directive.$$start) {
+                    $compileNode = groupScan(node, directive.$$start, directive.$$end);
+                }
+                if (directive.priority < terminalPriority) {
+                    return false;
+                }
+                if (directive.scope) {
+                    if (_.isObject(directive.scope)) {
+                        if (newIsolateScopeDirective || newScopeDirective) {
+                            throw '多个指令都要求新建 scope';
+                        }
+                        newIsolateScopeDirective = directive;
+                    } else {
+                        if (newIsolateScopeDirective) {
+                            throw '多个指令都要求新建 scope';
+                        }
+                        newScopeDirective = newScopeDirective || directive;
+                    }
+
+                }
+
+                if (directive.controller) {
+                    controllerDirectives = controllerDirectives || {};
+                    controllerDirectives[directive.name] = directive;
+                }
+
+                if (directive.terminal) {
+                    terminal = true;
+                    terminalPriority = directive.priority;
+                }
+
+                if (directive.transclude) {
+                    if (hasTranscludeDirective) {
+                        throw "多个指令存在嵌入模板";
+                    }
+                    hasTranscludeDirective = true;
+                    var $transcludedNodes = $compileNode.clone().contents();
+                    childTranscludeFn = compile($transcludedNodes);
+                    $compileNode.empty();
+                }
+                if (directive.template) {
+                    if (templateDirective) {
+                        throw '多个指令存在模板';
+                    }
+                    templateDirective = directive;
+                    if (_.isFunction(directive.template)) {
+                        $compileNode.html(directive.template($compileNode, attrs));
+                    } else {
+                        $compileNode.html(directive.template);
+                    }
+
+                }
+                if (directive.templateUrl) {
+                    if (templateDirective) {
+                        throw '多个指令请求模板';
+                    }
+                    templateDirective = directive;
+                    nodeLinkFn = compileTemplateUrl(
+                        _.drop(directives, i),
+                        $compileNode, attrs, {
+                            templateDirective: templateDirective,
+                            newIsolateScopeDirective: newIsolateScopeDirective,
+                            controllerDirectives: controllerDirectives,
+                            preLinkFns: preLinkFns,
+                            postLinkFns: postLinkFns
+                        }
+                    );
+                    return false;
+                } else if (directive.compile) {
+                    var linkFn = directive.compile($compileNode, attrs);
+                    var isolateScope = (directive === newIsolateScopeDirective);
+                    var attrStart = directive.$$start;
+                    var attrEnd = directive.$$end;
+                    var require = directive.require;
+                    if (_.isFunction(linkFn)) {
+                        addLinkFns(null, linkFn, attrStart, attrEnd, isolateScope, require);
+                    } else if (linkFn) {
+                        addLinkFns(linkFn.pre, linkFn.post, attrStart, attrEnd, isolateScope, require);
+                    }
+                }
+            });
+
+            function compileTemplateUrl(directives, $compileNode, attrs, previousCompileContext) {
+                var origAsyncDirective = directives.shift();
+                var derivedSyncDirective = _.extend({},
+                    origAsyncDirective, { templateUrl: null }
+                );
+                var templateUrl = _.isFunction(origAsyncDirective.templateUrl) ?
+                    origAsyncDirective.templateUrl($compileNode, attrs) :
+                    origAsyncDirective.templateUrl;
+                var afterTemplateNodeLinkFn,
+                    afterTemplateChildLinkFn;
+                var linkQueue = [];
+                $compileNode.empty();
+                $http.get(templateUrl).success(function(template) {
+                    directives.unshift(derivedSyncDirective);
+                    $compileNode.html(template);
+                    afterTemplateNodeLinkFn = applyDirectivesToNode(
+                        directives, $compileNode, attrs, previousCompileContext);
+                    afterTemplateChildLinkFn = compileNodes($compileNode[0].childNodes);
+                    _.forEach(linkQueue, function(linkCall) {
+                        afterTemplateNodeLinkFn(afterTemplateChildLinkFn, linkCall.scope, linkCall.linkNode);
+                    });
+                    linkQueue = null;
+                });
+
+                return function delayedNodeLinkFn(_ignoreChildLinkFn, scope, linkNode) {
+                    if (linkQueue) {
+                        linkQueue.push({ scope: scope, linkNode: linkNode });
+                    } else {
+                        afterTemplateNodeLinkFn(afterTemplateChildLinkFn, scope, linkNode);
+                    }
+                };
             }
+
+
             nodeLinkFn.terminal = terminal;
             nodeLinkFn.scope = newScopeDirective && newScopeDirective.scope;
+            nodeLinkFn.transcludeOnThisElement = hasTranscludeDirective;
+            nodeLinkFn.transclude = childTranscludeFn;
             return nodeLinkFn;
         }
 
