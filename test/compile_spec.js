@@ -2733,11 +2733,11 @@ describe('指令(directive)--$compile', function() {
                         transclude: true,
                         scope: true,
                         link: function(scope, element, attrs, ctrl, transclude) {
-                             element.append(transclude());
+                            element.append(transclude());
                             scope.$on('destroyNow', function() {
                                 scope.$destroy();
                             });
-                           
+
                         }
                     };
                 },
@@ -2775,10 +2775,10 @@ describe('指令(directive)--$compile', function() {
                     return {
                         transclude: true,
                         scope: true,
-                        template:"<div></div>",
+                        template: "<div></div>",
                         link: function(scope, element, attrs, ctrl, transclude) {
-                            var myScope=scope.$new(true);
-                            myScope.specialAttr=42;
+                            var myScope = scope.$new(true);
+                            myScope.specialAttr = 42;
                             transclude(myScope);
                         }
                     };
@@ -2797,9 +2797,62 @@ describe('指令(directive)--$compile', function() {
                 var transcludedScope = watchSpy.calls.first().args[0];
                 expect(transcludedScope.specialAttr).toBe(42);
             });
-
-
         });
+
+
+
+        it('将嵌入模板放入子元素', function() {
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        transclude: true,
+                        template: "<div in-template></div>"
+                    };
+                },
+                inTemplate: function() {
+                    return {
+                        link: function(scope, element, attrs, ctrl, transclude) {
+                            element.append(transclude());
+                        }
+                    };
+                }
+            });
+
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir ><div in-transclude></div></div>');
+                $compile(el)($rootScope);
+                expect(el.find('>[in-template]>[in-transclude]').length).toBe(1);
+            });
+        });
+
+        it('将嵌入模板放入子元素的子元素', function() {
+            var injector = makeInjectorWithDirectives({
+                myDir: function() {
+                    return {
+                        transclude: true,
+                        template: "<div><div in-template></div></div>"
+                    };
+                },
+                inTemplate: function() {
+                    return {
+                        link: function(scope, element, attrs, ctrl, transclude) {
+                            element.append(transclude());
+                        }
+                    };
+                }
+            });
+
+
+            injector.invoke(function($compile, $rootScope) {
+                var el = $('<div my-dir ><div in-transclude></div></div>');
+                $compile(el)($rootScope);
+                expect(el.find('>div>[in-template]>[in-transclude]').length).toBe(1);
+            });
+        });
+
+
+
 
     });
 });
